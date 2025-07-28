@@ -7,7 +7,12 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "version:patch": "npm version patch && git push --follow-tags",
+    "version:minor": "npm version minor && git push --follow-tags",
+    "version:major": "npm version major && git push --follow-tags",
+    "push": "bash scripts/push-to-github.sh",
+    "release": "bash scripts/version-management.sh"
   },
   "dependencies": {
     "@automerge/automerge": "^3.0.0",
