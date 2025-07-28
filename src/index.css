@@ -1,0 +1,432 @@
+/* 基础样式重置 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Diff 功能专用样式 */
+.diff-container {
+  height: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Consolas', monospace;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.diff-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.diff-panel.old {
+  border-right: 1px solid #e5e7eb;
+}
+
+.diff-header {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.diff-header.old {
+  background-color: #fef2f2;
+  color: #dc2626;
+}
+
+.diff-header.new {
+  background-color: #f0fdf4;
+  color: #16a34a;
+}
+
+.diff-content {
+  flex: 1;
+  overflow-y: auto;
+  background-color: #fafafa;
+}
+
+.diff-line {
+  padding: 0.25rem 1rem;
+  margin: 0;
+  white-space: pre-wrap;
+  border-left: 3px solid transparent;
+  transition: background-color 0.15s ease;
+}
+
+.diff-line:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.diff-line.removed {
+  background-color: #fee2e2;
+  border-left-color: #dc2626;
+  color: #dc2626;
+}
+
+.diff-line.added {
+  background-color: #dcfce7;
+  border-left-color: #16a34a;
+  color: #16a34a;
+}
+
+.diff-line.unchanged {
+  color: #374151;
+}
+
+.diff-line-number {
+  display: inline-block;
+  width: 3em;
+  color: #9ca3af;
+  font-size: 0.75rem;
+  user-select: none;
+  margin-right: 0.5rem;
+}
+
+.diff-marker {
+  color: inherit;
+  font-weight: 600;
+  margin-right: 0.25rem;
+}
+
+/* 版本选择状态 */
+.version-item {
+  padding: 0.5rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 0.75rem;
+  background-color: white;
+}
+
+.version-item:hover {
+  border-color: #d1d5db;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.version-item.selected {
+  background-color: #dbeafe;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 1px #3b82f6;
+}
+
+.version-item .version-message {
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.25rem;
+}
+
+.version-item .version-meta {
+  color: #6b7280;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.version-item .auto-commit-badge {
+  color: #f59e0b;
+  font-size: 0.625rem;
+  font-weight: 500;
+}
+
+/* 选择提示 */
+.selection-hint {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background-color: #fef3c7;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  color: #92400e;
+  border: 1px solid #fbbf24;
+}
+
+.selection-hint.ready {
+  background-color: #d1fae5;
+  color: #065f46;
+  border-color: #10b981;
+}
+
+/* 编辑器样式 */
+.editor-textarea {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Consolas', monospace;
+  line-height: 1.6;
+  tab-size: 2;
+}
+
+.editor-textarea:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* 防止文本选择时的闪烁 */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 自定义基础样式 */
+@layer base {
+  * {
+    border-color: #e5e7eb;
+  }
+
+  body {
+    background-color: white;
+    color: #111827;
+    font-family: system-ui, -apple-system, sans-serif;
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* 编辑器相关样式 */
+@layer components {
+  .editor-container {
+    width: 100%;
+    height: 100%;
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Consolas', monospace;
+  }
+
+  .editor-textarea {
+    width: 100%;
+    height: 100%;
+    padding: 1rem;
+    background-color: transparent;
+    border: none;
+    outline: none;
+    resize: none;
+    font-size: 0.875rem;
+    line-height: 1.625;
+  }
+
+  .history-item {
+    padding: 0.75rem;
+    border-bottom: 1px solid #e5e7eb;
+    cursor: pointer;
+    transition: colors 150ms;
+  }
+
+  .history-item:hover {
+    background-color: #f9fafb;
+  }
+
+  .diff-viewer {
+    font-size: 0.875rem;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Consolas', monospace;
+  }
+
+  .toolbar-button {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-radius: 0.375rem;
+    background-color: white;
+    border: 1px solid #d1d5db;
+    color: #374151;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .toolbar-button:hover {
+    background-color: #f9fafb;
+    border-color: #9ca3af;
+  }
+
+  .toolbar-button:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px #3b82f6;
+  }
+
+  .toolbar-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .toolbar-button-primary {
+    background-color: #2563eb;
+    border-color: #2563eb;
+    color: white;
+  }
+
+  .toolbar-button-primary:hover:not(:disabled) {
+    background-color: #1d4ed8;
+    border-color: #1d4ed8;
+  }
+
+  /* 模式切换按钮组 */
+  .mode-button-group {
+    display: flex;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    overflow: hidden;
+  }
+
+  .mode-button {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    background-color: white;
+    color: #374151;
+    border-right: 1px solid #d1d5db;
+  }
+
+  .mode-button:last-child {
+    border-right: none;
+  }
+
+  .mode-button.active {
+    background-color: #2563eb;
+    color: white;
+  }
+
+  .mode-button.diff-mode {
+    background-color: #f59e0b;
+    color: white;
+  }
+
+  .mode-button:hover:not(.active) {
+    background-color: #f9fafb;
+  }
+
+  /* Markdown 预览样式 */
+  .markdown-preview h1,
+  .markdown-preview h2,
+  .markdown-preview h3,
+  .markdown-preview h4,
+  .markdown-preview h5,
+  .markdown-preview h6 {
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+
+  .markdown-preview h1 {
+    font-size: 2rem;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 0.5rem;
+  }
+
+  .markdown-preview h2 {
+    font-size: 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 0.25rem;
+  }
+
+  .markdown-preview h3 {
+    font-size: 1.25rem;
+  }
+
+  .markdown-preview p {
+    margin-bottom: 1rem;
+  }
+
+  .markdown-preview ul,
+  .markdown-preview ol {
+    margin-bottom: 1rem;
+    padding-left: 1.5rem;
+  }
+
+  .markdown-preview li {
+    margin-bottom: 0.25rem;
+  }
+
+  .markdown-preview code {
+    background-color: #f3f4f6;
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.25rem;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Consolas', monospace;
+    font-size: 0.875rem;
+  }
+
+  .markdown-preview pre {
+    background-color: #1f2937;
+    color: #f9fafb;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    overflow-x: auto;
+    margin-bottom: 1rem;
+  }
+
+  .markdown-preview pre code {
+    background-color: transparent;
+    padding: 0;
+    color: inherit;
+  }
+
+  .markdown-preview blockquote {
+    border-left: 4px solid #d1d5db;
+    padding-left: 1rem;
+    margin: 1rem 0;
+    color: #6b7280;
+    font-style: italic;
+  }
+
+  .markdown-preview table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1rem;
+  }
+
+  .markdown-preview th,
+  .markdown-preview td {
+    border: 1px solid #e5e7eb;
+    padding: 0.5rem;
+    text-align: left;
+  }
+
+  .markdown-preview th {
+    background-color: #f9fafb;
+    font-weight: 600;
+  }
+
+  .markdown-preview a {
+    color: #2563eb;
+    text-decoration: underline;
+  }
+
+  .markdown-preview a:hover {
+    color: #1d4ed8;
+  }
+}
