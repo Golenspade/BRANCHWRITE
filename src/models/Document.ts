@@ -1,8 +1,8 @@
 import * as Automerge from '@automerge/automerge';
-import { TextOperation } from '../types';
+import type { TextOperation } from '../types/index';
 
 interface DocumentData {
-  text: Automerge.Text;
+  text: string;
   metadata: {
     title: string;
     createdAt: number;
@@ -17,7 +17,7 @@ export class Document {
 
   constructor(initialText: string = '', title: string = 'Untitled') {
     this.doc = Automerge.from({
-      text: new Automerge.Text(initialText),
+      text: initialText,
       metadata: {
         title,
         createdAt: Date.now(),
@@ -37,17 +37,17 @@ export class Document {
           case 'insert':
             if (op.content) {
               // 在指定位置插入文本
-              doc.text.insertAt(op.position, ...op.content.split(''));
+              const before = doc.text.substring(0, op.position);
+              const after = doc.text.substring(op.position);
+              doc.text = before + op.content + after;
             }
             break;
           case 'delete':
             if (op.length) {
               // 删除指定位置和长度的文本
-              for (let i = 0; i < op.length; i++) {
-                if (op.position < doc.text.length) {
-                  doc.text.deleteAt(op.position);
-                }
-              }
+              const before = doc.text.substring(0, op.position);
+              const after = doc.text.substring(op.position + op.length);
+              doc.text = before + after;
             }
             break;
           case 'retain':
@@ -64,28 +64,25 @@ export class Document {
   }
 
   /**
+   * 获取文档内容
+   */
+  getText(): string {
+    return this.doc.text;
+  }
+
+  /**
    * 直接设置文本内容
    */
   setText(text: string): void {
     this.doc = Automerge.change(this.doc, (doc) => {
-      // 清空现有文本
-      doc.text.deleteAt(0, doc.text.length);
-      // 插入新文本
-      if (text.length > 0) {
-        doc.text.insertAt(0, ...text.split(''));
-      }
+      doc.text = text;
       doc.metadata.lastModified = Date.now();
       doc.metadata.version += 1;
     });
     this.notifyListeners();
   }
 
-  /**
-   * 获取当前文档的纯文本内容
-   */
-  getText(): string {
-    return this.doc.text.toString();
-  }
+
 
   /**
    * 获取文档元数据
@@ -125,7 +122,8 @@ export class Document {
    * 应用变更集
    */
   applyChanges(changes: Automerge.Change[]): void {
-    this.doc = Automerge.applyChanges(this.doc, changes);
+    const [newDoc] = Automerge.applyChanges(this.doc, changes);
+    this.doc = newDoc;
     this.notifyListeners();
   }
 

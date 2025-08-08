@@ -6,6 +6,13 @@ import wasm from 'vite-plugin-wasm'
 export default defineConfig({
   plugins: [react(), wasm()],
   optimizeDeps: {
-    exclude: ['@automerge/automerge']
+    exclude: ['@automerge/automerge'],
+    include: ['monaco-editor/esm/vs/language/typescript/ts.worker', 'monaco-editor/esm/vs/editor/editor.worker']
+  },
+  define: {
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV)
+  },
+  worker: {
+    format: 'es'
   }
 })

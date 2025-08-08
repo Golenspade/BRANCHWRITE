@@ -1,4 +1,4 @@
-import { DiffResult, DiffChange } from '../types';
+import type { DiffResult, DiffChange } from '../types/index';
 
 export class DiffEngine {
   /**

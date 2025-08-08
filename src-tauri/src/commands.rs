@@ -1,4 +1,4 @@
-use crate::file_system::{FileSystemManager, ProjectConfig, ProjectData};
+use crate::file_system::{FileSystemManager, ProjectConfig, ProjectData, BookConfig, BookData, DocumentConfig};
 use anyhow::Result;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -115,42 +115,79 @@ pub async fn get_project_stats(
 
 /// 选择文件夹对话框
 #[tauri::command]
-pub async fn select_folder() -> Result<Option<String>, String> {
-    use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
-    
-    // 这里需要在实际的 Tauri 应用上下文中调用
-    // 暂时返回一个占位符
-    Ok(None)
+pub async fn select_folder(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    use std::sync::{Arc, Mutex};
+
+    let result = Arc::new(Mutex::new(None));
+    let result_clone = result.clone();
+
+    app.dialog()
+        .file()
+        .pick_folder(move |path| {
+            let mut result = result_clone.lock().unwrap();
+            *result = path.map(|p| p.to_string());
+        });
+
+    // 等待一小段时间让对话框完成
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    let final_result = result.lock().unwrap().clone();
+    Ok(final_result)
 }
 
 /// 选择文件对话框
 #[tauri::command]
-pub async fn select_file(filters: Vec<(String, Vec<String>)>) -> Result<Option<String>, String> {
-    use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
-    
-    // 这里需要在实际的 Tauri 应用上下文中调用
-    // 暂时返回一个占位符
-    Ok(None)
+pub async fn select_file(app: tauri::AppHandle, filters: Vec<(String, Vec<String>)>) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    use std::sync::{Arc, Mutex};
+
+    let result = Arc::new(Mutex::new(None));
+    let result_clone = result.clone();
+
+    let mut file_dialog = app.dialog().file();
+
+    // 添加文件过滤器
+    for (name, extensions) in filters {
+        let ext_refs: Vec<&str> = extensions.iter().map(|s| s.as_str()).collect();
+        file_dialog = file_dialog.add_filter(&name, &ext_refs);
+    }
+
+    file_dialog.pick_file(move |path| {
+        let mut result = result_clone.lock().unwrap();
+        *result = path.map(|p| p.to_string());
+    });
+
+    // 等待一小段时间让对话框完成
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    let final_result = result.lock().unwrap().clone();
+    Ok(final_result)
 }
 
 /// 显示消息对话框
 #[tauri::command]
 pub async fn show_message(
+    app: tauri::AppHandle,
     title: String,
     message: String,
     kind: String,
 ) -> Result<(), String> {
     use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
-    
+
     let dialog_kind = match kind.as_str() {
         "info" => MessageDialogKind::Info,
         "warning" => MessageDialogKind::Warning,
         "error" => MessageDialogKind::Error,
         _ => MessageDialogKind::Info,
     };
-    
-    // 这里需要在实际的 Tauri 应用上下文中调用
-    // 暂时返回成功
+
+    app.dialog()
+        .message(message)
+        .title(title)
+        .kind(dialog_kind)
+        .blocking_show();
+
     Ok(())
 }
 
@@ -277,4 +314,146 @@ pub async fn get_desktop_dir() -> Result<String, String> {
     dirs::desktop_dir()
         .map(|dir| dir.to_string_lossy().to_string())
         .ok_or_else(|| "Failed to get desktop directory".to_string())
+}
+
+// ===== 书籍管理命令 =====
+
+/// 创建新书籍
+#[tauri::command]
+pub async fn create_book(
+    state: State<'_, AppState>,
+    name: String,
+    description: String,
+    author: String,
+    genre: String,
+) -> Result<BookData, String> {
+    let file_manager = state.file_manager.lock().map_err(|e| e.to_string())?;
+
+    file_manager
+        .create_book(&name, &description, &author, &genre)
+        .map_err(|e| e.to_string())
+}
+
+/// 列出所有书籍
+#[tauri::command]
+pub async fn list_books(
+    state: State<'_, AppState>,
+) -> Result<Vec<BookConfig>, String> {
+    let file_manager = state.file_manager.lock().map_err(|e| e.to_string())?;
+
+    file_manager
+        .list_books()
+        .map_err(|e| e.to_string())
+}
+
+/// 加载书籍
+#[tauri::command]
+pub async fn load_book(
+    state: State<'_, AppState>,
+    book_id: String,
+) -> Result<BookData, String> {
+    let file_manager = state.file_manager.lock().map_err(|e| e.to_string())?;
+
+    file_manager
+        .load_book(&book_id)
+        .map_err(|e| e.to_string())
+}
+
+/// 保存书籍
+#[tauri::command]
+pub async fn save_book(
+    state: State<'_, AppState>,
+    book_data: BookData,
+) -> Result<(), String> {
+    let file_manager = state.file_manager.lock().map_err(|e| e.to_string())?;
+
+    file_manager
+        .save_book(&book_data)
+        .map_err(|e| e.to_string())
+}
+
+/// 删除书籍
+#[tauri::command]
+pub async fn delete_book(
+    state: State<'_, AppState>,
+    book_id: String,
+) -> Result<(), String> {
+    let file_manager = state.file_manager.lock().map_err(|e| e.to_string())?;
+
+    file_manager
+        .delete_book(&book_id)
+        .map_err(|e| e.to_string())
+}
+
+// ===== 文档管理命令 =====
+
+/// 创建新文档
+#[tauri::command]
+pub async fn create_document(
+    state: State<'_, AppState>,
+    book_id: String,
+    title: String,
+    doc_type: String,
+) -> Result<DocumentConfig, String> {
+    let file_manager = state.file_manager.lock().map_err(|e| e.to_string())?;
+
+    file_manager
+        .create_document(&book_id, &title, &doc_type)
+        .map_err(|e| e.to_string())
+}
+
+/// 列出书籍的所有文档
+#[tauri::command]
+pub async fn list_documents(
+    state: State<'_, AppState>,
+    book_id: String,
+) -> Result<Vec<DocumentConfig>, String> {
+    let file_manager = state.file_manager.lock().map_err(|e| e.to_string())?;
+
+    file_manager
+        .list_documents(&book_id)
+        .map_err(|e| e.to_string())
+}
+
+/// 加载文档内容
+#[tauri::command]
+pub async fn load_document(
+    state: State<'_, AppState>,
+    book_id: String,
+    document_id: String,
+) -> Result<String, String> {
+    let file_manager = state.file_manager.lock().map_err(|e| e.to_string())?;
+
+    file_manager
+        .load_document(&book_id, &document_id)
+        .map_err(|e| e.to_string())
+}
+
+/// 保存文档内容
+#[tauri::command]
+pub async fn save_document(
+    state: State<'_, AppState>,
+    book_id: String,
+    document_id: String,
+    content: String,
+) -> Result<(), String> {
+    let file_manager = state.file_manager.lock().map_err(|e| e.to_string())?;
+
+    file_manager
+        .save_document(&book_id, &document_id, &content)
+        .map_err(|e| e.to_string())
+}
+
+/// 删除文档
+#[tauri::command]
+pub async fn delete_document(
+    state: State<'_, AppState>,
+    book_id: String,
+    document_id: String,
+) -> Result<(), String> {
+    let file_manager = state.file_manager.lock().map_err(|e| e.to_string())?;
+
+    file_manager
+        .delete_document(&book_id, &document_id)
+        .map_err(|e| e.to_string())
 }

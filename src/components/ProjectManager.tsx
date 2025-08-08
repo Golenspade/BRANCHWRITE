@@ -102,14 +102,22 @@ export function ProjectManagerComponent({ isOpen, onClose, onProjectSelect }: Pr
   // 导出项目
   const handleExportProject = async (projectId: string, projectName: string) => {
     try {
+      console.log('开始导出项目:', { projectId, projectName });
+
       const desktopDir = await FileSystemService.getDesktopDir();
+      console.log('获取桌面目录:', desktopDir);
+
       const exportPath = `${desktopDir}/BranchWrite_${projectName}_${new Date().toISOString().split('T')[0]}`;
-      
+      console.log('导出路径:', exportPath);
+
       await FileSystemService.exportProject(projectId, exportPath);
+      console.log('导出完成');
+
       await FileSystemService.showMessage('成功', `项目已导出到：${exportPath}`, 'info');
     } catch (error) {
       console.error('Failed to export project:', error);
-      await FileSystemService.showMessage('错误', '导出项目失败', 'error');
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      await FileSystemService.showMessage('错误', `导出项目失败: ${errorMessage}`, 'error');
     }
   };
 

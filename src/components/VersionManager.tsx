@@ -1,15 +1,16 @@
 import { useState, useMemo } from 'react';
-import { useAppStore } from '../stores/appStore';
-import { CommitInfo } from '../types';
+import type { CommitInfo } from '../types/index';
+import type { DocumentManager } from '../models/DocumentManager';
 import { VersionDetail } from './VersionDetail';
 
 interface VersionManagerProps {
+  documentManager: DocumentManager;
   onVersionSelect?: (commitId: string) => void;
-  onVersionCompare?: (commitId: string) => void;
+  onVersionDiff?: (fromCommit: string, toCommit: string) => void;
 }
 
-export function VersionManager({ onVersionSelect, onVersionCompare }: VersionManagerProps) {
-  const { commits, checkoutCommit, documentManager } = useAppStore();
+export function VersionManager({ documentManager, onVersionSelect, onVersionDiff }: VersionManagerProps) {
+  const commits = documentManager.getCommitHistory();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'manual' | 'auto'>('all');
   const [selectedCommits, setSelectedCommits] = useState<string[]>([]);
@@ -85,63 +86,142 @@ export function VersionManager({ onVersionSelect, onVersionCompare }: VersionMan
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* 搜索和过滤栏 */}
-      <div className="p-4 border-b border-gray-200 space-y-3">
-        <div className="flex items-center space-x-2">
+      <div style={{
+        padding: '1rem',
+        borderBottom: '1px solid #e5e7eb',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.75rem'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <input
             type="text"
             placeholder="搜索版本..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            style={{
+              flex: 1,
+              padding: '0.5rem 0.75rem',
+              fontSize: '0.875rem',
+              border: '1px solid #d1d5db',
+              borderRadius: '0.375rem',
+              outline: 'none',
+              transition: 'all 0.2s'
+            }}
+            onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+            onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
           />
           <button
             onClick={() => setSearchTerm('')}
-            className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700"
+            style={{
+              padding: '0.5rem 0.75rem',
+              fontSize: '0.875rem',
+              color: '#6b7280',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'color 0.2s'
+            }}
+            onMouseEnter={(e) => e.target.style.color = '#374151'}
+            onMouseLeave={(e) => e.target.style.color = '#6b7280'}
           >
             清除
           </button>
         </div>
-        
-        <div className="flex items-center justify-between">
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value as 'all' | 'manual' | 'auto')}
-            className="px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            style={{
+              padding: '0.5rem 0.75rem',
+              fontSize: '0.875rem',
+              border: '1px solid #d1d5db',
+              borderRadius: '0.375rem',
+              outline: 'none',
+              transition: 'all 0.2s'
+            }}
+            onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+            onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
           >
             <option value="all">所有版本</option>
             <option value="manual">手动保存</option>
             <option value="auto">自动保存</option>
           </select>
-          
-          <div className="text-sm text-gray-500">
+
+          <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
             {filteredCommits.length} / {commits.length} 个版本
           </div>
         </div>
 
         {/* 批量操作栏 */}
         {selectedCommits.length > 0 && (
-          <div className="flex items-center justify-between p-2 bg-blue-50 rounded-md">
-            <span className="text-sm text-blue-700">
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0.5rem',
+            backgroundColor: '#eff6ff',
+            borderRadius: '0.375rem',
+            animation: 'fadeIn 0.2s ease-in-out'
+          }}>
+            <span style={{ fontSize: '0.875rem', color: '#1d4ed8' }}>
               已选择 {selectedCommits.length} 个版本
             </span>
-            <div className="flex items-center space-x-2">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <button
                 onClick={handleExportVersions}
-                className="px-3 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded hover:bg-blue-200"
+                style={{
+                  padding: '0.25rem 0.75rem',
+                  fontSize: '0.75rem',
+                  fontWeight: '500',
+                  color: '#1d4ed8',
+                  backgroundColor: '#dbeafe',
+                  border: 'none',
+                  borderRadius: '0.25rem',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#bfdbfe'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#dbeafe'}
               >
                 导出
               </button>
               <button
                 onClick={() => setSelectedCommits([])}
-                className="px-3 py-1 text-xs font-medium text-gray-700 bg-gray-100 rounded hover:bg-gray-200"
+                style={{
+                  padding: '0.25rem 0.75rem',
+                  fontSize: '0.75rem',
+                  fontWeight: '500',
+                  color: '#374151',
+                  backgroundColor: '#f3f4f6',
+                  border: 'none',
+                  borderRadius: '0.25rem',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#e5e7eb'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#f3f4f6'}
               >
                 取消选择
               </button>
               <button
                 onClick={handleBatchDelete}
-                className="px-3 py-1 text-xs font-medium text-red-700 bg-red-100 rounded hover:bg-red-200"
+                style={{
+                  padding: '0.25rem 0.75rem',
+                  fontSize: '0.75rem',
+                  fontWeight: '500',
+                  color: '#b91c1c',
+                  backgroundColor: '#fee2e2',
+                  border: 'none',
+                  borderRadius: '0.25rem',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#fecaca'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#fee2e2'}
               >
                 删除
               </button>
@@ -151,9 +231,9 @@ export function VersionManager({ onVersionSelect, onVersionCompare }: VersionMan
       </div>
 
       {/* 版本列表 */}
-      <div className="flex-1 overflow-y-auto">
+      <div style={{ flex: 1, overflowY: 'auto' }}>
         {filteredCommits.length === 0 ? (
-          <div className="p-4 text-center text-gray-500">
+          <div style={{ padding: '1rem', textAlign: 'center', color: '#6b7280' }}>
             {searchTerm || filterType !== 'all' ? (
               <div>
                 <p>没有找到匹配的版本</p>
@@ -162,7 +242,17 @@ export function VersionManager({ onVersionSelect, onVersionCompare }: VersionMan
                     setSearchTerm('');
                     setFilterType('all');
                   }}
-                  className="mt-2 text-sm text-blue-600 hover:text-blue-800"
+                  style={{
+                    marginTop: '0.5rem',
+                    fontSize: '0.875rem',
+                    color: '#2563eb',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'color 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.target.style.color = '#1d4ed8'}
+                  onMouseLeave={(e) => e.target.style.color = '#2563eb'}
                 >
                   清除筛选条件
                 </button>
@@ -170,35 +260,43 @@ export function VersionManager({ onVersionSelect, onVersionCompare }: VersionMan
             ) : (
               <div>
                 <p>暂无版本历史</p>
-                <p className="text-sm mt-2">开始写作后会自动创建版本快照</p>
+                <p style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>开始写作后会自动创建版本快照</p>
               </div>
             )}
           </div>
         ) : (
-          <div className="space-y-1">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             {filteredCommits.map((commit, index) => (
               <div
                 key={commit.id}
-                className={`history-item relative ${
-                  selectedCommits.includes(commit.id) ? 'bg-blue-50 border-blue-200' : ''
+                className={`history-item ${
+                  selectedCommits.includes(commit.id) ? 'selected' : ''
                 }`}
                 onClick={(e) => {
                   if (e.ctrlKey || e.metaKey) {
                     handleCommitSelect(commit.id, true);
                   } else {
                     if (confirm(`确定要切换到版本 "${commit.message}" 吗？\n\n注意：当前未保存的更改将会丢失。`)) {
-                      const success = checkoutCommit(commit.id);
-                      if (success) {
-                        console.log('成功切换到版本:', commit.id);
-                      } else {
-                        alert('切换版本失败，请重试。');
+                      try {
+                        const success = documentManager.checkoutCommit(commit.id);
+                        if (success) {
+                          onVersionSelect?.(commit.id);
+                          console.log('成功切换到版本:', commit.id);
+                          // 清除选择状态，避免重复显示
+                          setSelectedCommits([]);
+                        } else {
+                          alert('切换版本失败，请重试。');
+                        }
+                      } catch (error) {
+                        console.error('版本切换错误:', error);
+                        alert('切换版本时发生错误，请重试。');
                       }
                     }
                   }
                 }}
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start space-x-3 flex-1 min-w-0">
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', flex: 1, minWidth: 0 }}>
                     {/* 选择框 */}
                     <input
                       type="checkbox"
@@ -207,52 +305,133 @@ export function VersionManager({ onVersionSelect, onVersionCompare }: VersionMan
                         e.stopPropagation();
                         handleCommitSelect(commit.id, true);
                       }}
-                      className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      style={{
+                        marginTop: '0.25rem',
+                        width: '1rem',
+                        height: '1rem',
+                        accentColor: '#3b82f6',
+                        cursor: 'pointer'
+                      }}
                     />
-                    
+
                     {/* 版本信息 */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2">
-                        <p className="text-sm font-medium text-gray-900 truncate">
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                        <p style={{
+                          fontSize: '0.875rem',
+                          fontWeight: '500',
+                          color: '#111827',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          flex: 1
+                        }}>
                           {commit.message}
                         </p>
                         {commit.isAutoCommit ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            padding: '0.125rem 0.5rem',
+                            borderRadius: '9999px',
+                            fontSize: '0.75rem',
+                            fontWeight: '500',
+                            backgroundColor: '#dbeafe',
+                            color: '#1e40af'
+                          }}>
                             自动
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            padding: '0.125rem 0.5rem',
+                            borderRadius: '9999px',
+                            fontSize: '0.75rem',
+                            fontWeight: '500',
+                            backgroundColor: '#dcfce7',
+                            color: '#166534'
+                          }}>
                             手动
                           </span>
                         )}
                         {index === 0 && (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            padding: '0.125rem 0.5rem',
+                            borderRadius: '9999px',
+                            fontSize: '0.75rem',
+                            fontWeight: '500',
+                            backgroundColor: '#fef3c7',
+                            color: '#92400e'
+                          }}>
                             当前
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p style={{
+                        fontSize: '0.75rem',
+                        color: '#6b7280',
+                        marginTop: '0.25rem'
+                      }}>
                         {formatTimestamp(commit.timestamp)}
                       </p>
-                      <p className="text-xs text-gray-400 mt-1">
+                      <p style={{
+                        fontSize: '0.75rem',
+                        color: '#9ca3af',
+                        marginTop: '0.25rem'
+                      }}>
                         ID: {commit.id.substring(0, 8)}...
                       </p>
                     </div>
                   </div>
-                  
+
                   {/* 操作按钮 */}
-                  <div className="flex-shrink-0 ml-2 flex items-center space-x-1">
-                    <button 
-                      className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1"
+                  <div style={{
+                    flexShrink: 0,
+                    marginLeft: '0.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.25rem'
+                  }}>
+                    <button
+                      style={{
+                        fontSize: '0.75rem',
+                        color: '#2563eb',
+                        background: 'none',
+                        border: 'none',
+                        padding: '0.25rem 0.5rem',
+                        cursor: 'pointer',
+                        borderRadius: '0.25rem',
+                        transition: 'color 0.2s'
+                      }}
+                      onMouseEnter={(e) => (e.target as HTMLElement).style.color = '#1d4ed8'}
+                      onMouseLeave={(e) => (e.target as HTMLElement).style.color = '#2563eb'}
                       onClick={(e) => {
                         e.stopPropagation();
-                        onVersionCompare?.(commit.id);
+                        if (selectedCommits.length === 1) {
+                          onVersionDiff?.(selectedCommits[0], commit.id);
+                        } else {
+                          alert('请先选择一个版本进行对比');
+                        }
                       }}
                     >
                       对比
                     </button>
                     <button
-                      className="text-xs text-gray-600 hover:text-gray-800 px-2 py-1"
+                      style={{
+                        fontSize: '0.75rem',
+                        color: '#4b5563',
+                        background: 'none',
+                        border: 'none',
+                        padding: '0.25rem 0.5rem',
+                        cursor: 'pointer',
+                        borderRadius: '0.25rem',
+                        transition: 'color 0.2s'
+                      }}
+                      onMouseEnter={(e) => (e.target as HTMLElement).style.color = '#374151'}
+                      onMouseLeave={(e) => (e.target as HTMLElement).style.color = '#4b5563'}
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedCommitForDetail(commit.id);
@@ -270,18 +449,28 @@ export function VersionManager({ onVersionSelect, onVersionCompare }: VersionMan
       </div>
 
       {/* 底部统计信息 */}
-      <div className="p-3 border-t border-gray-200 bg-gray-50">
-        <div className="flex items-center justify-between text-xs text-gray-600">
+      <div style={{
+        padding: '0.75rem',
+        borderTop: '1px solid #e5e7eb',
+        backgroundColor: '#f9fafb'
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: '0.75rem',
+          color: '#4b5563'
+        }}>
           <div>
-            总版本: {commits.length} | 
-            手动: {commits.filter(c => !c.isAutoCommit).length} | 
+            总版本: {commits.length} |
+            手动: {commits.filter(c => !c.isAutoCommit).length} |
             自动: {commits.filter(c => c.isAutoCommit).length}
           </div>
           <div>
             {documentManager?.hasUnsavedChanges() ? (
-              <span className="text-orange-600">● 有未保存更改</span>
+              <span style={{ color: '#ea580c' }}>● 有未保存更改</span>
             ) : (
-              <span className="text-green-600">● 已保存</span>
+              <span style={{ color: '#16a34a' }}>● 已保存</span>
             )}
           </div>
         </div>

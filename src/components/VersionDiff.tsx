@@ -1,18 +1,16 @@
 import { useState, useEffect } from 'react';
-import { useAppStore } from '../stores/appStore';
-import { CommitInfo } from '../types';
+import type { DocumentManager } from '../models/DocumentManager';
 
 interface VersionDiffProps {
   isOpen: boolean;
   onClose: () => void;
-  fromCommitId?: string;
-  toCommitId?: string;
+  fromCommit: string;
+  toCommit: string;
+  documentManager: DocumentManager;
 }
 
-export function VersionDiff({ isOpen, onClose, fromCommitId, toCommitId }: VersionDiffProps) {
-  const { documentManager, commits } = useAppStore();
-  const [fromCommit, setFromCommit] = useState<string>(fromCommitId || '');
-  const [toCommit, setToCommit] = useState<string>(toCommitId || '');
+export function VersionDiff({ isOpen, onClose, fromCommit, toCommit, documentManager }: VersionDiffProps) {
+  const commits = documentManager.getCommitHistory();
   const [diffResult, setDiffResult] = useState<{
     oldText: string;
     newText: string;
@@ -76,80 +74,171 @@ export function VersionDiff({ isOpen, onClose, fromCommitId, toCommitId }: Versi
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl h-5/6 flex flex-col">
+    <div style={{
+      position: 'fixed',
+      inset: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 50
+    }}>
+      <div style={{
+        backgroundColor: 'white',
+        borderRadius: '0.5rem',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+        width: '100%',
+        maxWidth: '72rem',
+        height: '83.333333%',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
         {/* 头部 */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">版本对比</h2>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '1rem',
+          borderBottom: '1px solid #e5e7eb'
+        }}>
+          <h2 style={{
+            fontSize: '1.125rem',
+            fontWeight: '600',
+            color: '#111827'
+          }}>版本对比</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            style={{
+              color: '#9ca3af',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '0.25rem',
+              borderRadius: '0.25rem',
+              transition: 'color 0.2s'
+            }}
+            onMouseEnter={(e) => (e.target as HTMLElement).style.color = '#4b5563'}
+            onMouseLeave={(e) => (e.target as HTMLElement).style.color = '#9ca3af'}
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg style={{ width: '1.5rem', height: '1.5rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        {/* 版本选择器 */}
-        <div className="p-4 border-b border-gray-200 bg-gray-50">
-          <div className="grid grid-cols-2 gap-4">
+        {/* 版本信息 */}
+        <div style={{
+          padding: '1rem',
+          borderBottom: '1px solid #e5e7eb',
+          backgroundColor: '#f9fafb'
+        }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '1rem'
+          }}>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label style={{
+                display: 'block',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                color: '#374151',
+                marginBottom: '0.5rem'
+              }}>
                 原版本
               </label>
-              <select
-                value={fromCommit}
-                onChange={(e) => setFromCommit(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">选择版本...</option>
-                {commits.map((commit) => (
-                  <option key={commit.id} value={commit.id}>
-                    {commit.message} ({new Date(commit.timestamp).toLocaleString()})
-                  </option>
-                ))}
-              </select>
+              <div style={{
+                padding: '0.5rem',
+                backgroundColor: 'white',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem'
+              }}>
+                {(() => {
+                  const commit = commits.find(c => c.id === fromCommit);
+                  return commit ? `${commit.message} (${new Date(commit.timestamp).toLocaleString()})` : '未选择版本';
+                })()}
+              </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label style={{
+                display: 'block',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                color: '#374151',
+                marginBottom: '0.5rem'
+              }}>
                 新版本
               </label>
-              <select
-                value={toCommit}
-                onChange={(e) => setToCommit(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">选择版本...</option>
-                {commits.map((commit) => (
-                  <option key={commit.id} value={commit.id}>
-                    {commit.message} ({new Date(commit.timestamp).toLocaleString()})
-                  </option>
-                ))}
-              </select>
+              <div style={{
+                padding: '0.5rem',
+                backgroundColor: 'white',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem'
+              }}>
+                {(() => {
+                  const commit = commits.find(c => c.id === toCommit);
+                  return commit ? `${commit.message} (${new Date(commit.timestamp).toLocaleString()})` : '未选择版本';
+                })()}
+              </div>
             </div>
           </div>
         </div>
 
         {/* 差异显示 */}
-        <div className="flex-1 overflow-hidden">
+        <div style={{
+          flex: 1,
+          overflow: 'hidden',
+          minHeight: 0  // 确保 flex 子元素可以正确收缩
+        }}>
           {diffResult ? (
-            <div className="h-full grid grid-cols-2 gap-0">
+            <div style={{
+              height: '100%',
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 0,
+              minHeight: 0  // 确保 grid 容器可以正确收缩
+            }}>
               {/* 原版本 */}
-              <div className="border-r border-gray-200 flex flex-col">
-                <div className="px-4 py-2 bg-red-50 border-b border-gray-200">
-                  <h3 className="text-sm font-medium text-red-800">原版本</h3>
+              <div style={{
+                borderRight: '1px solid #e5e7eb',
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: 0  // 确保 flex 容器可以正确收缩
+              }}>
+                <div style={{
+                  padding: '0.5rem 1rem',
+                  backgroundColor: '#fef2f2',
+                  borderBottom: '1px solid #e5e7eb',
+                  flexShrink: 0  // 防止头部被压缩
+                }}>
+                  <h3 style={{
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#b91c1c',
+                    margin: 0
+                  }}>原版本</h3>
                 </div>
-                <div className="flex-1 overflow-y-auto p-4 font-mono text-sm">
+                <div style={{
+                  flex: 1,
+                  overflowY: 'auto',
+                  overflowX: 'hidden',
+                  padding: '1rem',
+                  fontFamily: 'monospace',
+                  fontSize: '0.875rem',
+                  minHeight: 0,  // 确保可以正确收缩
+                  maxHeight: '100%'  // 确保不会超出容器
+                }}>
                   {diffResult.changes.map((change, index) => (
                     change.type !== 'added' && (
                       <div
                         key={index}
-                        className={`${
-                          change.type === 'removed' 
-                            ? 'bg-red-100 text-red-800' 
-                            : 'text-gray-700'
-                        } px-2 py-1 whitespace-pre-wrap`}
+                        style={{
+                          backgroundColor: change.type === 'removed' ? '#fecaca' : 'transparent',
+                          color: change.type === 'removed' ? '#dc2626' : '#374151',
+                          padding: '0.125rem 0.5rem',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word'  // 防止长行导致水平滚动
+                        }}
                       >
                         {change.value}
                       </div>
@@ -159,20 +248,45 @@ export function VersionDiff({ isOpen, onClose, fromCommitId, toCommitId }: Versi
               </div>
 
               {/* 新版本 */}
-              <div className="flex flex-col">
-                <div className="px-4 py-2 bg-green-50 border-b border-gray-200">
-                  <h3 className="text-sm font-medium text-green-800">新版本</h3>
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: 0  // 确保 flex 容器可以正确收缩
+              }}>
+                <div style={{
+                  padding: '0.5rem 1rem',
+                  backgroundColor: '#f0fdf4',
+                  borderBottom: '1px solid #e5e7eb',
+                  flexShrink: 0  // 防止头部被压缩
+                }}>
+                  <h3 style={{
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#166534',
+                    margin: 0
+                  }}>新版本</h3>
                 </div>
-                <div className="flex-1 overflow-y-auto p-4 font-mono text-sm">
+                <div style={{
+                  flex: 1,
+                  overflowY: 'auto',
+                  overflowX: 'hidden',
+                  padding: '1rem',
+                  fontFamily: 'monospace',
+                  fontSize: '0.875rem',
+                  minHeight: 0,  // 确保可以正确收缩
+                  maxHeight: '100%'  // 确保不会超出容器
+                }}>
                   {diffResult.changes.map((change, index) => (
                     change.type !== 'removed' && (
                       <div
                         key={index}
-                        className={`${
-                          change.type === 'added' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'text-gray-700'
-                        } px-2 py-1 whitespace-pre-wrap`}
+                        style={{
+                          backgroundColor: change.type === 'added' ? '#86efac' : 'transparent',
+                          color: change.type === 'added' ? '#059669' : '#374151',
+                          padding: '0.125rem 0.5rem',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word'  // 防止长行导致水平滚动
+                        }}
                       >
                         {change.value}
                       </div>
@@ -182,22 +296,16 @@ export function VersionDiff({ isOpen, onClose, fromCommitId, toCommitId }: Versi
               </div>
             </div>
           ) : (
-            <div className="h-full flex items-center justify-center text-gray-500">
+            <div style={{
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#6b7280'
+            }}>
               <p>请选择两个版本进行对比</p>
             </div>
           )}
-        </div>
-
-        {/* 底部操作栏 */}
-        <div className="p-4 border-t border-gray-200 bg-gray-50">
-          <div className="flex justify-end space-x-2">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-            >
-              关闭
-            </button>
-          </div>
         </div>
       </div>
     </div>

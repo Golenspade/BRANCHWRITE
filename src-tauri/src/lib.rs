@@ -29,6 +29,18 @@ pub fn run() {
       commands::get_app_data_dir,
       commands::get_documents_dir,
       commands::get_desktop_dir,
+      // 书籍管理命令
+      commands::create_book,
+      commands::list_books,
+      commands::load_book,
+      commands::save_book,
+      commands::delete_book,
+      // 文档管理命令
+      commands::create_document,
+      commands::list_documents,
+      commands::load_document,
+      commands::save_document,
+      commands::delete_document,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

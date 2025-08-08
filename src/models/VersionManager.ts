@@ -1,4 +1,4 @@
-import { Commit, CommitInfo, DiffResult } from '../types';
+import type { Commit, CommitInfo, DiffResult } from '../types/index';
 import { Document } from './Document';
 import { DiffEngine } from './DiffEngine';
 

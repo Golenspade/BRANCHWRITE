@@ -1,5 +1,39 @@
 import { invoke } from '@tauri-apps/api/core';
 
+// 错误处理工具类
+class TauriError extends Error {
+  public originalError?: any;
+
+  constructor(message: string, originalError?: any) {
+    super(message);
+    this.name = 'TauriError';
+    this.originalError = originalError;
+  }
+}
+
+// 统一的错误处理函数
+async function handleTauriCall<T>(
+  command: string,
+  args?: Record<string, any>
+): Promise<T> {
+  try {
+    return await invoke<T>(command, args);
+  } catch (error) {
+    console.error(`Tauri command '${command}' failed:`, error);
+
+    // 提供更友好的错误信息
+    let friendlyMessage = `执行 ${command} 命令时发生错误`;
+
+    if (typeof error === 'string') {
+      friendlyMessage = error;
+    } else if (error instanceof Error) {
+      friendlyMessage = error.message;
+    }
+
+    throw new TauriError(friendlyMessage, error);
+  }
+}
+
 // 类型定义
 export interface ProjectConfig {
   id: string;
@@ -67,6 +101,51 @@ export interface DirectoryItem {
   is_dir: boolean;
   size: number;
   modified?: number;
+}
+
+// 书籍管理相关类型定义
+export interface BookSettings {
+  outline_enabled: boolean;
+  timeline_enabled: boolean;
+  auto_save_interval: number; // 分钟
+  target_word_count?: number;
+  deadline?: string;
+  editor_theme: string;
+  font_size: number;
+  line_height: number;
+  font_family: string;
+}
+
+export interface BookConfig {
+  id: string;
+  name: string;
+  description: string;
+  author: string;
+  genre: string;
+  created_at: string;
+  last_modified: string;
+  cover_image?: string;
+  tags: string[];
+  settings: BookSettings;
+}
+
+export interface DocumentConfig {
+  id: string;
+  book_id: string;
+  title: string;
+  order: number;
+  type: string; // 'chapter' | 'section' | 'note'
+  created_at: string;
+  last_modified: string;
+  word_count: number;
+  character_count: number;
+  status: string; // 'draft' | 'review' | 'final'
+}
+
+export interface BookData {
+  config: BookConfig;
+  documents: DocumentConfig[];
+  current_document_id?: string;
 }
 
 /**
@@ -212,6 +291,100 @@ export class FileSystemService {
    */
   static async getDesktopDir(): Promise<string> {
     return await invoke('get_desktop_dir');
+  }
+
+  /**
+   * 写入文本文件
+   */
+  static async writeTextFile(filePath: string, content: string): Promise<void> {
+    return await invoke('write_file', { path: filePath, content });
+  }
+
+  // ===== 书籍管理方法 =====
+
+  /**
+   * 创建新书籍
+   */
+  static async createBook(
+    name: string,
+    description: string,
+    author: string,
+    genre: string
+  ): Promise<BookData> {
+    return await invoke<BookData>('create_book', { name, description, author, genre });
+  }
+
+  /**
+   * 列出所有书籍
+   */
+  static async listBooks(): Promise<BookConfig[]> {
+    return await handleTauriCall<BookConfig[]>('list_books');
+  }
+
+  /**
+   * 加载书籍数据
+   */
+  static async loadBook(bookId: string): Promise<BookData> {
+    return await handleTauriCall<BookData>('load_book', { bookId });
+  }
+
+  /**
+   * 保存书籍数据
+   */
+  static async saveBook(bookData: BookData): Promise<void> {
+    return await handleTauriCall<void>('save_book', { bookData });
+  }
+
+  /**
+   * 删除书籍
+   */
+  static async deleteBook(bookId: string): Promise<void> {
+    return await handleTauriCall<void>('delete_book', { bookId });
+  }
+
+  // ===== 文档管理方法 =====
+
+  /**
+   * 创建新文档
+   */
+  static async createDocument(
+    bookId: string,
+    title: string,
+    docType: string
+  ): Promise<DocumentConfig> {
+    return await invoke('create_document', { bookId, title, docType });
+  }
+
+  /**
+   * 列出书籍的所有文档
+   */
+  static async listDocuments(bookId: string): Promise<DocumentConfig[]> {
+    return await invoke('list_documents', { bookId });
+  }
+
+  /**
+   * 加载文档内容
+   */
+  static async loadDocument(bookId: string, documentId: string): Promise<string> {
+    return await invoke('load_document', { bookId, documentId });
+  }
+
+  /**
+   * 保存文档内容
+   */
+  static async saveDocument(
+    bookId: string,
+    documentId: string,
+    content: string
+  ): Promise<void> {
+    return await invoke('save_document', { bookId, documentId, content });
+  }
+
+  /**
+   * 删除文档
+   */
+  static async deleteDocument(bookId: string, documentId: string): Promise<void> {
+    return await invoke('delete_document', { bookId, documentId });
   }
 }
 

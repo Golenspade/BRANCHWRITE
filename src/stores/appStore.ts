@@ -1,50 +1,69 @@
 import { create } from 'zustand';
-import { AppState, CommitInfo, ProjectConfig } from '../types';
+import type { AppState, CommitInfo, ProjectConfig, BookConfig, BookData, DocumentConfig } from '../types/index';
 import { DocumentManager } from '../models/DocumentManager';
-import { ProjectManager, ProjectData } from '../services/fileSystemService';
+import { FileSystemService } from '../services/fileSystemService';
 
 interface AppStore extends AppState {
-  // 项目相关
+  // 项目相关（保持向后兼容）
   projectConfig: ProjectConfig | null;
   projectPath: string | null;
-  currentProject: ProjectData | null;
 
-  // 文档管理器
-  documentManager: DocumentManager | null;
+  // 版本管理
+  commits: CommitInfo[];
 
-  // 文档相关
+  // 书籍管理
+  currentBook: BookData | null;
+  books: BookConfig[];
+  showBookSelector: boolean;
+
+  // 文档管理
+  currentDocumentConfig: DocumentConfig | null;
+  documents: DocumentConfig[];
+
+  // 文档相关（保持原有接口）
   setCurrentDocument: (content: string) => void;
   initializeDocument: (initialText?: string, title?: string) => void;
+
+  // 项目管理
+  createProject: (name: string, path: string) => Promise<void>;
   loadProject: (projectId: string) => Promise<void>;
   saveProject: () => Promise<void>;
 
-  // 版本管理
+  // 版本管理（简化版）
   createCommit: (message: string) => void;
-  checkoutCommit: (commitId: string) => boolean;
+  checkoutCommit: (commitId: string) => void;
+  getCommitDiff: (commitId: string) => any;
 
-  // 历史相关
-  commits: CommitInfo[];
-  setCommits: (commits: CommitInfo[]) => void;
-  addCommit: (commit: CommitInfo) => void;
-  refreshCommitHistory: () => void;
-  
-  // UI 状态
-  setHistoryPanelOpen: (open: boolean) => void;
-  setDiffViewOpen: (open: boolean) => void;
-  setSelectedCommits: (commitIds: string[]) => void;
-  setCurrentMode: (mode: 'edit' | 'preview' | 'diff') => void;
-  setLoading: (loading: boolean) => void;
-  setError: (error: string | null) => void;
-  
-  // 项目操作
-  setProjectConfig: (config: ProjectConfig) => void;
-  setProjectPath: (path: string) => void;
-  
-  // 重置状态
-  reset: () => void;
+  // 书本管理
+  loadBooks: () => Promise<void>;
+  loadBook: (bookId: string) => Promise<void>;
+  selectBook: (bookId: string) => Promise<void>;
+  createBook: (name: string, description: string, author: string, genre: string) => Promise<string>;
+  updateBook: (bookId: string, config: Partial<BookConfig>) => Promise<void>;
+  deleteBook: (bookId: string) => Promise<void>;
+  listBooks: () => Promise<BookConfig[]>;
+
+  // 文档管理
+  loadDocuments: (bookId: string) => Promise<void>;
+  loadDocumentContent: (bookId: string, documentId: string) => Promise<string>;
+  saveDocumentContent: (bookId: string, documentId: string, content: string) => Promise<void>;
+  selectDocument: (document: DocumentConfig) => void;
+  createDocument: (bookId: string, title: string, docType: string) => Promise<string>;
+  updateDocument: (documentId: string, updates: Partial<DocumentConfig>) => Promise<void>;
+  deleteDocument: (bookId: string, documentId: string) => Promise<void>;
+  switchDocument: (documentId: string) => Promise<void>;
+
+  // DocumentManager 相关
+  documentManager: DocumentManager | null;
+  initializeDocumentManager: (content: string, title: string) => void;
+
+  // 设置
+  updateSettings: (settings: Partial<any>) => void;
+  setShowBookSelector: (show: boolean) => void;
 }
 
-const initialState: AppState = {
+export const useAppStore = create<AppStore>((set, get) => ({
+  // 初始状态
   currentDocument: '',
   isHistoryPanelOpen: false,
   isDiffViewOpen: false,
@@ -52,159 +71,300 @@ const initialState: AppState = {
   currentMode: 'edit',
   isLoading: false,
   error: null,
-};
+  commits: [],
 
-export const useAppStore = create<AppStore>((set, get) => ({
-  ...initialState,
+  // 项目相关
   projectConfig: null,
   projectPath: null,
-  currentProject: null,
+
+  // 书籍相关
+  currentBook: null,
+  books: [],
+  showBookSelector: true, // 默认显示书本选择器
+
+  // 文档管理
+  currentDocumentConfig: null,
+  documents: [],
+
+  // DocumentManager
   documentManager: null,
-  commits: [],
 
   // 文档初始化
   initializeDocument: (initialText: string = '', title: string = 'Untitled') => {
-    const manager = new DocumentManager(initialText, title);
     set({
-      documentManager: manager,
-      currentDocument: manager.getCurrentDocument().getText(),
-      commits: manager.getCommitHistory(),
+      currentDocument: initialText,
+      commits: [],
     });
   },
 
   // 文档操作
   setCurrentDocument: (content: string) => {
-    const { documentManager } = get();
-    if (documentManager) {
-      documentManager.updateDocument(content);
-    }
-
-    // 更新项目管理器中的内容
-    ProjectManager.updateDocumentContent(content);
-
     set({ currentDocument: content });
   },
 
-  // 项目管理
+  // 项目管理（简化版）
+  createProject: async (name: string, path: string) => {
+    try {
+      set({ isLoading: true, error: null });
+      // 简化版本，暂时不实现
+      console.log('Create project:', name, path);
+      set({ isLoading: false });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to create project', isLoading: false });
+    }
+  },
+
   loadProject: async (projectId: string) => {
     try {
-      const project = await ProjectManager.loadAndSetProject(projectId);
-      const manager = new DocumentManager(project.document_content, project.document_metadata.title);
-
-      // 恢复提交历史
-      for (const commit of project.commits) {
-        const content = project.commit_data[commit.id] || '';
-        // 这里需要将 Rust 的提交格式转换为前端格式
-        // 暂时简化处理
-      }
-
-      set({
-        currentProject: project,
-        documentManager: manager,
-        currentDocument: project.document_content,
-        commits: project.commits.map(c => ({
-          id: c.id,
-          timestamp: new Date(c.timestamp).getTime(),
-          message: c.message,
-          isAutoCommit: c.is_auto_commit,
-        })),
-      });
+      set({ isLoading: true, error: null });
+      // 简化版本，暂时不实现
+      console.log('Load project:', projectId);
+      set({ isLoading: false });
     } catch (error) {
-      console.error('Failed to load project:', error);
-      throw error;
+      set({ error: error instanceof Error ? error.message : 'Failed to load project', isLoading: false });
     }
   },
 
   saveProject: async () => {
     try {
-      await ProjectManager.saveCurrentProject();
+      // 简化版本，暂时不实现
+      console.log('Save project');
     } catch (error) {
-      console.error('Failed to save project:', error);
+      set({ error: error instanceof Error ? error.message : 'Failed to save project' });
+    }
+  },
+
+  // 版本管理（简化版）
+  createCommit: (message: string) => {
+    const newCommit: CommitInfo = {
+      id: Date.now().toString(),
+      timestamp: Date.now(),
+      message,
+      isAutoCommit: false,
+    };
+    const { commits } = get();
+    set({ commits: [newCommit, ...commits] });
+  },
+
+  checkoutCommit: (commitId: string) => {
+    console.log('Checkout commit:', commitId);
+  },
+
+  getCommitDiff: (commitId: string) => {
+    console.log('Get commit diff:', commitId);
+    return null;
+  },
+
+  // 书本管理（简化版）
+  loadBooks: async () => {
+    try {
+      set({ isLoading: true, error: null });
+
+      // 获取书本列表
+      const booksList = await get().listBooks();
+      set({
+        books: booksList,
+        isLoading: false
+      });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to load books', isLoading: false });
+    }
+  },
+
+  selectBook: async (bookId: string) => {
+    try {
+      await get().loadBook(bookId);
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to select book' });
+    }
+  },
+
+  loadBook: async (bookId: string) => {
+    try {
+      set({ isLoading: true, error: null });
+
+      const bookData = await FileSystemService.loadBook(bookId);
+
+      set({
+        currentBook: bookData,
+        documents: bookData.documents,
+        currentDocumentConfig: bookData.documents[0] || null,
+        showBookSelector: false,
+        isLoading: false,
+      });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to load book', isLoading: false });
+    }
+  },
+
+  createBook: async (name: string, description: string, author: string, genre: string) => {
+    try {
+      const bookData = await FileSystemService.createBook(
+        name,
+        description,
+        author,
+        genre
+      );
+
+      // 更新本地书籍列表
+      const { books } = get();
+      set({ books: [bookData.config, ...books] });
+
+      return bookData.config.id;
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to create book' });
       throw error;
     }
   },
 
-  // 版本管理
-  createCommit: (message: string) => {
-    const { documentManager } = get();
-    if (documentManager) {
-      documentManager.createCommit(message, false);
-      set({ commits: documentManager.getCommitHistory() });
+  updateBook: async (bookId: string, config: Partial<BookConfig>) => {
+    try {
+      console.log('Update book:', bookId, config);
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to update book' });
     }
-
-    // 同时在项目管理器中添加提交
-    ProjectManager.addCommit(message, false);
   },
 
-  checkoutCommit: (commitId: string) => {
-    const { documentManager } = get();
-    if (documentManager) {
-      const success = documentManager.checkoutCommit(commitId);
-      if (success) {
+  deleteBook: async (bookId: string) => {
+    try {
+      await FileSystemService.deleteBook(bookId);
+
+      // 更新本地书籍列表
+      const { books, currentBook } = get();
+      const updatedBooks = books.filter(book => book.id !== bookId);
+      set({ books: updatedBooks });
+
+      // 如果删除的是当前书籍，清除当前书籍状态
+      if (currentBook?.config.id === bookId) {
         set({
-          currentDocument: documentManager.getCurrentDocument().getText(),
-          commits: documentManager.getCommitHistory(),
+          currentBook: null,
+          documents: [],
+          currentDocumentConfig: null,
+          currentDocument: '',
+          showBookSelector: true,
         });
       }
-      return success;
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to delete book' });
     }
-    return false;
   },
 
-  refreshCommitHistory: () => {
-    const { documentManager } = get();
-    if (documentManager) {
-      set({ commits: documentManager.getCommitHistory() });
+  listBooks: async () => {
+    try {
+      return await FileSystemService.listBooks();
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to list books' });
+      return [];
     }
   },
-  
-  // 历史操作
-  setCommits: (commits: CommitInfo[]) => 
-    set({ commits }),
-  
-  addCommit: (commit: CommitInfo) => 
-    set((state) => ({ 
-      commits: [commit, ...state.commits] 
-    })),
-  
-  // UI 状态操作
-  setHistoryPanelOpen: (open: boolean) => 
-    set({ isHistoryPanelOpen: open }),
-  
-  setDiffViewOpen: (open: boolean) => 
-    set({ isDiffViewOpen: open }),
-  
-  setSelectedCommits: (commitIds: string[]) => 
-    set({ selectedCommits: commitIds }),
-  
-  setCurrentMode: (mode: 'edit' | 'preview' | 'diff') => 
-    set({ currentMode: mode }),
-  
-  setLoading: (loading: boolean) => 
-    set({ isLoading: loading }),
-  
-  setError: (error: string | null) => 
-    set({ error }),
-  
-  // 项目操作
-  setProjectConfig: (config: ProjectConfig) => 
-    set({ projectConfig: config }),
-  
-  setProjectPath: (path: string) => 
-    set({ projectPath: path }),
-  
-  // 重置状态
-  reset: () => {
-    const { documentManager } = get();
-    if (documentManager) {
-      documentManager.destroy();
+
+  // 文档管理（简化版）
+  createDocument: async (bookId: string, title: string, docType: string) => {
+    try {
+      const newDoc = await FileSystemService.createDocument(bookId, title, docType);
+
+      // 更新文档列表
+      const { documents } = get();
+      set({ documents: [...documents, newDoc] });
+
+      return newDoc.id;
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to create document' });
+      throw error;
     }
-    set({
-      ...initialState,
-      projectConfig: null,
-      projectPath: null,
-      documentManager: null,
-      commits: [],
-    });
+  },
+
+  updateDocument: async (documentId: string, updates: Partial<DocumentConfig>) => {
+    try {
+      console.log('Update document:', documentId, updates);
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to update document' });
+    }
+  },
+
+  deleteDocument: async (bookId: string, documentId: string) => {
+    try {
+      await FileSystemService.deleteDocument(bookId, documentId);
+
+      // 从文档列表中移除
+      const { documents } = get();
+      const updatedDocuments = documents.filter(doc => doc.id !== documentId);
+      set({ documents: updatedDocuments });
+
+      // 如果删除的是当前文档，清空当前文档
+      const { currentDocumentConfig } = get();
+      if (currentDocumentConfig?.id === documentId) {
+        set({ currentDocumentConfig: null, currentDocument: '' });
+      }
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to delete document' });
+    }
+  },
+
+  switchDocument: async (documentId: string) => {
+    try {
+      console.log('Switch document:', documentId);
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to switch document' });
+    }
+  },
+
+  // 文档内容管理
+  loadDocuments: async (bookId: string) => {
+    try {
+      set({ isLoading: true, error: null });
+
+      const documents = await FileSystemService.listDocuments(bookId);
+
+      set({
+        documents,
+        isLoading: false
+      });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to load documents', isLoading: false });
+    }
+  },
+
+  loadDocumentContent: async (bookId: string, documentId: string) => {
+    try {
+      return await FileSystemService.loadDocument(bookId, documentId);
+    } catch (error) {
+      console.error('Failed to load document content:', error);
+      throw error;
+    }
+  },
+
+  saveDocumentContent: async (bookId: string, documentId: string, content: string) => {
+    try {
+      await FileSystemService.saveDocument(bookId, documentId, content);
+
+      // 更新文档管理器
+      const { documentManager } = get();
+      if (documentManager) {
+        documentManager.updateDocument(content);
+      }
+    } catch (error) {
+      console.error('Failed to save document content:', error);
+      throw error;
+    }
+  },
+
+  selectDocument: (document: DocumentConfig) => {
+    set({ currentDocumentConfig: document });
+  },
+
+  // DocumentManager 相关
+  initializeDocumentManager: (content: string, title: string) => {
+    const manager = new DocumentManager(content, title);
+    set({ documentManager: manager });
+  },
+
+  // 设置
+  updateSettings: (settings: Partial<any>) => {
+    console.log('Update settings:', settings);
+  },
+
+  setShowBookSelector: (show: boolean) => {
+    set({ showBookSelector: show });
   },
 }));

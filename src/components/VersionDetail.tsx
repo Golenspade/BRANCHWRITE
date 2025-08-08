@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../stores/appStore';
-import { CommitInfo } from '../types';
+import type { CommitInfo } from '../types/index';
 
 interface VersionDetailProps {
   isOpen: boolean;
@@ -53,51 +53,105 @@ export function VersionDetail({ isOpen, onClose, commitId }: VersionDetailProps)
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl h-5/6 flex flex-col">
+    <div style={{
+      position: 'fixed',
+      inset: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 50
+    }}>
+      <div style={{
+        backgroundColor: 'white',
+        borderRadius: '0.5rem',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+        width: '100%',
+        maxWidth: '56rem',
+        height: '83.333333%',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
         {/* 头部 */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '1rem',
+          borderBottom: '1px solid #e5e7eb'
+        }}>
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">版本详情</h2>
-            <p className="text-sm text-gray-500 mt-1">
+            <h2 style={{
+              fontSize: '1.125rem',
+              fontWeight: '600',
+              color: '#111827'
+            }}>版本详情</h2>
+            <p style={{
+              fontSize: '0.875rem',
+              color: '#6b7280',
+              marginTop: '0.25rem'
+            }}>
               {commitInfo.message}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            style={{
+              color: '#9ca3af',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '0.25rem',
+              borderRadius: '0.25rem',
+              transition: 'color 0.2s'
+            }}
+            onMouseEnter={(e) => e.target.style.color = '#4b5563'}
+            onMouseLeave={(e) => e.target.style.color = '#9ca3af'}
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg style={{ width: '1.5rem', height: '1.5rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
         {/* 内容区域 */}
-        <div className="flex-1 overflow-hidden flex">
+        <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
           {/* 左侧：版本信息 */}
-          <div className="w-1/3 border-r border-gray-200 p-4 overflow-y-auto">
-            <div className="space-y-4">
+          <div style={{
+            width: '33.333333%',
+            borderRight: '1px solid #e5e7eb',
+            padding: '1rem',
+            overflowY: 'auto'
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {/* 基本信息 */}
               <div>
-                <h3 className="text-sm font-medium text-gray-900 mb-2">基本信息</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">版本ID:</span>
-                    <span className="font-mono text-xs">{commitInfo.id.substring(0, 12)}...</span>
+                <h3 style={{
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: '#111827',
+                  marginBottom: '0.5rem'
+                }}>基本信息</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.875rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#6b7280' }}>版本ID:</span>
+                    <span style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>{commitInfo.id.substring(0, 12)}...</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">类型:</span>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      commitInfo.isAutoCommit 
-                        ? 'bg-blue-100 text-blue-800' 
-                        : 'bg-green-100 text-green-800'
-                    }`}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#6b7280' }}>类型:</span>
+                    <span style={{
+                      padding: '0.125rem 0.5rem',
+                      borderRadius: '9999px',
+                      fontSize: '0.75rem',
+                      fontWeight: '500',
+                      backgroundColor: commitInfo.isAutoCommit ? '#dbeafe' : '#dcfce7',
+                      color: commitInfo.isAutoCommit ? '#1e40af' : '#166534'
+                    }}>
                       {commitInfo.isAutoCommit ? '自动保存' : '手动保存'}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">创建时间:</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#6b7280' }}>创建时间:</span>
                     <span>{new Date(commitInfo.timestamp).toLocaleString()}</span>
                   </div>
                 </div>

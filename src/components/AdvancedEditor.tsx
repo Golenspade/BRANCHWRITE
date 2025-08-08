@@ -253,6 +253,49 @@ export function AdvancedEditor({
     }
   };
 
+  // 包装选中文本的方法
+  const wrapSelectedText = (prefix: string, suffix: string, placeholder: string = '') => {
+    if (editorRef.current) {
+      const selection = editorRef.current.getSelection();
+      const model = editorRef.current.getModel();
+
+      if (selection && model) {
+        const selectedText = model.getValueInRange(selection);
+
+        let newText;
+        if (selectedText.trim()) {
+          // 如果有选中文本，包装它
+          newText = `${prefix}${selectedText}${suffix}`;
+        } else {
+          // 如果没有选中文本，插入占位符
+          newText = `${prefix}${placeholder}${suffix}`;
+        }
+
+        const range = new (window as any).monaco.Range(
+          selection.startLineNumber,
+          selection.startColumn,
+          selection.endLineNumber,
+          selection.endColumn
+        );
+
+        editorRef.current.executeEdits('', [{ range, text: newText }]);
+
+        // 如果使用了占位符，选中占位符文本
+        if (!selectedText.trim() && placeholder) {
+          const newSelection = new (window as any).monaco.Selection(
+            selection.startLineNumber,
+            selection.startColumn + prefix.length,
+            selection.startLineNumber,
+            selection.startColumn + prefix.length + placeholder.length
+          );
+          editorRef.current.setSelection(newSelection);
+        }
+
+        editorRef.current.focus();
+      }
+    }
+  };
+
   // 格式化文档
   const formatDocument = () => {
     if (editorRef.current) {
@@ -261,61 +304,127 @@ export function AdvancedEditor({
   };
 
   return (
-    <div className="h-full flex flex-col">
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* 编辑器工具栏 */}
-      <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
-        <div className="flex items-center space-x-2">
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '0.5rem 1rem',
+        backgroundColor: '#f9fafb',
+        borderBottom: '1px solid #e5e7eb',
+        flexShrink: 0
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <button
-            onClick={() => insertText('**粗体**')}
-            className="px-2 py-1 text-sm font-bold bg-white border border-gray-300 rounded hover:bg-gray-50"
+            onClick={() => wrapSelectedText('**', '**', '粗体')}
+            style={{
+              padding: '0.25rem 0.5rem',
+              fontSize: '0.875rem',
+              fontWeight: 'bold',
+              backgroundColor: 'white',
+              border: '1px solid #d1d5db',
+              borderRadius: '0.25rem',
+              cursor: 'pointer'
+            }}
             title="粗体 (Ctrl+B)"
           >
             B
           </button>
           <button
-            onClick={() => insertText('*斜体*')}
-            className="px-2 py-1 text-sm italic bg-white border border-gray-300 rounded hover:bg-gray-50"
+            onClick={() => wrapSelectedText('*', '*', '斜体')}
+            style={{
+              padding: '0.25rem 0.5rem',
+              fontSize: '0.875rem',
+              fontStyle: 'italic',
+              backgroundColor: 'white',
+              border: '1px solid #d1d5db',
+              borderRadius: '0.25rem',
+              cursor: 'pointer'
+            }}
             title="斜体 (Ctrl+I)"
           >
             I
           </button>
           <button
-            onClick={() => insertText('`代码`')}
-            className="px-2 py-1 text-sm font-mono bg-white border border-gray-300 rounded hover:bg-gray-50"
+            onClick={() => wrapSelectedText('`', '`', '代码')}
+            style={{
+              padding: '0.25rem 0.5rem',
+              fontSize: '0.875rem',
+              fontFamily: 'monospace',
+              backgroundColor: 'white',
+              border: '1px solid #d1d5db',
+              borderRadius: '0.25rem',
+              cursor: 'pointer'
+            }}
             title="行内代码"
           >
             &lt;/&gt;
           </button>
-          <div className="w-px h-4 bg-gray-300"></div>
+          <div style={{ width: '1px', height: '1rem', backgroundColor: '#d1d5db' }}></div>
           <button
             onClick={() => insertText('# 标题')}
-            className="px-2 py-1 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50"
+            style={{
+              padding: '0.25rem 0.5rem',
+              fontSize: '0.875rem',
+              backgroundColor: 'white',
+              border: '1px solid #d1d5db',
+              borderRadius: '0.25rem',
+              cursor: 'pointer'
+            }}
             title="标题"
           >
             H1
           </button>
           <button
             onClick={() => insertText('[链接文本](URL)')}
-            className="px-2 py-1 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50"
+            style={{
+              padding: '0.25rem 0.5rem',
+              fontSize: '0.875rem',
+              backgroundColor: 'white',
+              border: '1px solid #d1d5db',
+              borderRadius: '0.25rem',
+              cursor: 'pointer'
+            }}
             title="链接"
           >
             🔗
           </button>
           <button
             onClick={() => insertText('![图片描述](图片URL)')}
-            className="px-2 py-1 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50"
+            style={{
+              padding: '0.25rem 0.5rem',
+              fontSize: '0.875rem',
+              backgroundColor: 'white',
+              border: '1px solid #d1d5db',
+              borderRadius: '0.25rem',
+              cursor: 'pointer'
+            }}
             title="图片"
           >
             🖼️
           </button>
         </div>
-        
-        <div className="flex items-center space-x-4 text-sm text-gray-600">
+
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1rem',
+          fontSize: '0.875rem',
+          color: '#6b7280'
+        }}>
           <span>行 {cursorPosition.line}, 列 {cursorPosition.column}</span>
           <span>字数: {wordCount}</span>
           <button
             onClick={formatDocument}
-            className="px-2 py-1 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50"
+            style={{
+              padding: '0.25rem 0.5rem',
+              fontSize: '0.875rem',
+              backgroundColor: 'white',
+              border: '1px solid #d1d5db',
+              borderRadius: '0.25rem',
+              cursor: 'pointer'
+            }}
             title="格式化文档"
           >
             格式化
@@ -324,7 +433,11 @@ export function AdvancedEditor({
       </div>
 
       {/* Monaco 编辑器 */}
-      <div className="flex-1">
+      <div style={{
+        flex: 1,
+        minHeight: 0,
+        position: 'relative'
+      }}>
         <Editor
           height="100%"
           language={language}
@@ -334,8 +447,13 @@ export function AdvancedEditor({
           onMount={handleEditorDidMount}
           onChange={handleEditorChange}
           loading={
-            <div className="flex items-center justify-center h-full">
-              <div className="text-gray-500">加载编辑器中...</div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '100%'
+            }}>
+              <div style={{ color: '#6b7280' }}>加载编辑器中...</div>
             </div>
           }
         />

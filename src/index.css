@@ -13,6 +13,12 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Loading spinner animation */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 /* Diff 功能专用样式 */
 .diff-container {
   height: 100%;
@@ -193,6 +199,108 @@ body {
 * {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* 加载动画 */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 高亮编辑器样式 */
+.highlight-editor {
+  position: relative;
+}
+
+.highlight-editor:empty:before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  pointer-events: none;
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+}
+
+.highlight-editor:focus {
+  outline: none;
+}
+
+/* 搜索高亮样式 */
+.search-highlight {
+  background-color: #fef3c7 !important;
+  color: #92400e !important;
+  border: 1px solid #fbbf24 !important;
+  padding: 0.125rem 0.25rem !important;
+  border-radius: 0.125rem !important;
+  transition: all 0.2s ease !important;
+  display: inline !important;
+  font-weight: normal !important;
+}
+
+.search-highlight.current {
+  background-color: #f59e0b !important;
+  color: white !important;
+  border: 2px solid #d97706 !important;
+  border-radius: 0.25rem !important;
+  font-weight: bold !important;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3) !important;
+  animation: pulse-highlight 1s ease-in-out !important;
+}
+
+/* 当前高亮项的脉冲动画 */
+@keyframes pulse-highlight {
+  0% {
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3);
+  }
+}
+
+/* 搜索面板样式 */
+.search-panel {
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 替换确认对话框动画 */
+.replace-confirm-dialog {
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 禁用按钮样式 */
+.toolbar-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toolbar-button:disabled:hover {
+  background-color: inherit;
+  transform: none;
 }
 
 /* 自定义基础样式 */
@@ -428,5 +536,53 @@ body {
 
   .markdown-preview a:hover {
     color: #1d4ed8;
+  }
+
+  /* 版本管理组件增强样式 */
+  .history-item {
+    padding: 0.75rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    margin-bottom: 0.5rem;
+    background: white;
+    transition: all 0.2s ease-in-out;
+    animation: slideIn 0.3s ease-out;
+    cursor: pointer;
+  }
+
+  .history-item:hover {
+    border-color: #d1d5db;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+  }
+
+  .history-item.selected {
+    background-color: #eff6ff;
+    border-color: #bfdbfe;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+  }
+
+  /* 卡片效果 */
+  .card {
+    background: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.2s ease-in-out;
+  }
+
+  .card:hover {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+
+  /* 滑入动画 */
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
   }
 }

@@ -1,5 +1,5 @@
 import { Document } from './Document';
-import { Commit, CommitInfo } from '../types';
+import type { Commit, CommitInfo } from '../types/index';
 
 /**
  * 文档管理器 - 负责管理文档的版本历史和状态
@@ -99,13 +99,34 @@ export class DocumentManager {
       return false;
     }
 
-    // 创建当前状态的提交（如果有未保存的更改）
+    // 只有在有实质性更改时才创建自动提交
     if (this.hasUnsavedChanges()) {
-      this.createCommit('自动保存 - 切换版本前', true);
+      const currentText = this.currentDocument.getText();
+      const currentWordCount = currentText.trim().split(/\s+/).filter(word => word.length > 0).length;
+
+      // 获取最后一次提交的字数
+      let lastWordCount = 0;
+      if (this.commitHistory.length > 0) {
+        const lastCommit = this.commitHistory[this.commitHistory.length - 1];
+        const lastDoc = this.getDocumentAtCommit(lastCommit.id);
+        if (lastDoc) {
+          const lastText = lastDoc.getText();
+          lastWordCount = lastText.trim().split(/\s+/).filter(word => word.length > 0).length;
+        }
+      }
+
+      // 只有当字数变化超过10个字时才自动保存
+      if (Math.abs(currentWordCount - lastWordCount) > 10) {
+        this.createCommit('自动保存 - 切换版本前', true);
+      }
     }
 
     // 切换到目标版本
     this.currentDocument = targetDoc.clone();
+
+    // 更新最后提交哈希，避免误判为未保存状态
+    this.lastAutoCommitHash = this.currentDocument.getHash();
+
     return true;
   }
 
