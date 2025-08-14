@@ -1,5 +1,11 @@
 import React, { useState } from 'react';
 import { IntegrationTest } from '../test/IntegrationTest';
+import { TimelineDemo } from './TimelineDemo';
+
+// 环境检测
+const isTauriEnvironment = () => {
+  return typeof window !== 'undefined' && '__TAURI__' in window;
+};
 
 interface TestResult {
   success: boolean;
@@ -11,6 +17,7 @@ export function IntegrationTestRunner() {
   const [isRunning, setIsRunning] = useState(false);
   const [results, setResults] = useState<TestResult[]>([]);
   const [logs, setLogs] = useState<string[]>([]);
+  const [showTimelineDemo, setShowTimelineDemo] = useState(false);
 
   // 重写 console.log 来捕获测试日志
   const originalConsoleLog = console.log;
@@ -41,9 +48,23 @@ export function IntegrationTestRunner() {
     captureConsole();
 
     try {
+      if (!isTauriEnvironment()) {
+        // Web 环境下的提示
+        setResults(prev => [...prev, {
+          success: false,
+          message: '进程失败: This feature is only available in the desktop app',
+          timestamp: new Date()
+        }]);
+        setLogs(prev => [...prev, '[INFO] 🌐 当前运行在 Web 环境中']);
+        setLogs(prev => [...prev, '[INFO] 📱 测试系统需要桌面应用环境才能完整运行']);
+        setLogs(prev => [...prev, '[INFO] 🚀 请使用 "npm run tauri dev" 启动桌面版本进行完整测试']);
+        setLogs(prev => [...prev, '[INFO] ✨ Web 环境下可以正常使用编辑、版本管理等核心功能']);
+        return;
+      }
+
       // 运行主要集成测试
       await IntegrationTest.runAllTests();
-      
+
       setResults(prev => [...prev, {
         success: true,
         message: '所有集成测试通过',
@@ -52,7 +73,7 @@ export function IntegrationTestRunner() {
 
       // 运行错误处理测试
       await IntegrationTest.testErrorHandling();
-      
+
       setResults(prev => [...prev, {
         success: true,
         message: '错误处理测试通过',
@@ -127,6 +148,21 @@ export function IntegrationTestRunner() {
           }}
         >
           清除结果
+        </button>
+
+        <button
+          onClick={() => setShowTimelineDemo(true)}
+          style={{
+            padding: '0.5rem 1rem',
+            backgroundColor: '#8b5cf6',
+            color: 'white',
+            border: 'none',
+            borderRadius: '0.375rem',
+            cursor: 'pointer',
+            fontSize: '0.875rem'
+          }}
+        >
+          📈 时间线演示
         </button>
       </div>
 
@@ -259,6 +295,12 @@ export function IntegrationTestRunner() {
           注意：测试会创建临时数据并在完成后自动清理
         </div>
       </div>
+
+      {/* 时间线演示 */}
+      <TimelineDemo
+        isOpen={showTimelineDemo}
+        onClose={() => setShowTimelineDemo(false)}
+      />
     </div>
   );
 }

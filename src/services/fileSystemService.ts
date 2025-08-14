@@ -1,4 +1,29 @@
-import { invoke } from '@tauri-apps/api/core';
+import { WebFileSystemAdapter } from './webAdapter';
+
+// 环境检测
+const isTauriEnvironment = () => {
+  return typeof window !== 'undefined' && '__TAURI__' in window;
+};
+
+// 动态导入 Tauri API
+let tauriInvoke: any = null;
+
+const getTauriInvoke = async () => {
+  if (!isTauriEnvironment()) {
+    throw new Error('Tauri API is not available in web environment');
+  }
+
+  if (!tauriInvoke) {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      tauriInvoke = invoke;
+    } catch (error) {
+      throw new Error('Failed to load Tauri API');
+    }
+  }
+
+  return tauriInvoke;
+};
 
 // 错误处理工具类
 class TauriError extends Error {
@@ -17,7 +42,12 @@ async function handleTauriCall<T>(
   args?: Record<string, any>
 ): Promise<T> {
   try {
-    return await invoke<T>(command, args);
+    if (!isTauriEnvironment()) {
+      throw new Error('This feature is only available in the desktop app');
+    }
+
+    const invoke = await getTauriInvoke();
+    return await invoke(command, args) as T;
   } catch (error) {
     console.error(`Tauri command '${command}' failed:`, error);
 
@@ -160,63 +190,63 @@ export class FileSystemService {
     description: string,
     author: string
   ): Promise<ProjectData> {
-    return await invoke('create_project', { name, description, author });
+    return await handleTauriCall<ProjectData>('create_project', { name, description, author });
   }
 
   /**
    * 保存项目
    */
   static async saveProject(projectData: ProjectData): Promise<void> {
-    return await invoke('save_project', { projectData });
+    return await handleTauriCall<void>('save_project', { projectData });
   }
 
   /**
    * 加载项目
    */
   static async loadProject(projectId: string): Promise<ProjectData> {
-    return await invoke('load_project', { projectId });
+    return await handleTauriCall<ProjectData>('load_project', { projectId });
   }
 
   /**
    * 列出所有项目
    */
   static async listProjects(): Promise<ProjectConfig[]> {
-    return await invoke('list_projects');
+    return await handleTauriCall<ProjectConfig[]>('list_projects');
   }
 
   /**
    * 删除项目
    */
   static async deleteProject(projectId: string): Promise<void> {
-    return await invoke('delete_project', { projectId });
+    return await handleTauriCall<void>('delete_project', { projectId });
   }
 
   /**
    * 导出项目
    */
   static async exportProject(projectId: string, exportPath: string): Promise<void> {
-    return await invoke('export_project', { projectId, exportPath });
+    return await handleTauriCall<void>('export_project', { projectId, exportPath });
   }
 
   /**
    * 获取项目统计信息
    */
   static async getProjectStats(projectId: string): Promise<Record<string, any>> {
-    return await invoke('get_project_stats', { projectId });
+    return await handleTauriCall<Record<string, any>>('get_project_stats', { projectId });
   }
 
   /**
    * 选择文件夹
    */
   static async selectFolder(): Promise<string | null> {
-    return await invoke('select_folder');
+    return await handleTauriCall<string | null>('select_folder');
   }
 
   /**
    * 选择文件
    */
   static async selectFile(filters: Array<[string, string[]]>): Promise<string | null> {
-    return await invoke('select_file', { filters });
+    return await handleTauriCall<string | null>('select_file', { filters });
   }
 
   /**
@@ -227,77 +257,80 @@ export class FileSystemService {
     message: string,
     kind: 'info' | 'warning' | 'error' = 'info'
   ): Promise<void> {
-    return await invoke('show_message', { title, message, kind });
+    if (!isTauriEnvironment()) {
+      return await WebFileSystemAdapter.showMessage(title, message, kind);
+    }
+    return await handleTauriCall('show_message', { title, message, kind });
   }
 
   /**
    * 检查文件是否存在
    */
   static async fileExists(path: string): Promise<boolean> {
-    return await invoke('file_exists', { path });
+    return await handleTauriCall('file_exists', { path });
   }
 
   /**
    * 创建目录
    */
   static async createDirectory(path: string): Promise<void> {
-    return await invoke('create_directory', { path });
+    return await handleTauriCall('create_directory', { path });
   }
 
   /**
    * 读取文件内容
    */
   static async readFile(path: string): Promise<string> {
-    return await invoke('read_file', { path });
+    return await handleTauriCall('read_file', { path });
   }
 
   /**
    * 写入文件内容
    */
   static async writeFile(path: string, content: string): Promise<void> {
-    return await invoke('write_file', { path, content });
+    return await handleTauriCall('write_file', { path, content });
   }
 
   /**
    * 获取文件信息
    */
   static async getFileInfo(path: string): Promise<FileInfo> {
-    return await invoke('get_file_info', { path });
+    return await handleTauriCall('get_file_info', { path });
   }
 
   /**
    * 列出目录内容
    */
   static async listDirectory(path: string): Promise<DirectoryItem[]> {
-    return await invoke('list_directory', { path });
+    return await handleTauriCall('list_directory', { path });
   }
 
   /**
    * 获取应用数据目录
    */
   static async getAppDataDir(): Promise<string> {
-    return await invoke('get_app_data_dir');
+    return await handleTauriCall('get_app_data_dir');
   }
 
   /**
    * 获取用户文档目录
    */
   static async getDocumentsDir(): Promise<string> {
-    return await invoke('get_documents_dir');
+    return await handleTauriCall('get_documents_dir');
   }
 
   /**
    * 获取桌面目录
    */
   static async getDesktopDir(): Promise<string> {
-    return await invoke('get_desktop_dir');
+    return await handleTauriCall('get_desktop_dir');
   }
 
   /**
    * 写入文本文件
    */
   static async writeTextFile(filePath: string, content: string): Promise<void> {
-    return await invoke('write_file', { path: filePath, content });
+    return await handleTauriCall('write_file', { path: filePath, content });
   }
 
   // ===== 书籍管理方法 =====
@@ -311,13 +344,61 @@ export class FileSystemService {
     author: string,
     genre: string
   ): Promise<BookData> {
-    return await invoke<BookData>('create_book', { name, description, author, genre });
+    if (!isTauriEnvironment()) {
+      // Web 环境下创建项目（映射为书籍）
+      const project = await WebFileSystemAdapter.createProject(name, description, author);
+      return {
+        config: {
+          id: project.id,
+          name: project.name,
+          description: project.description,
+          author: project.author,
+          genre: genre || 'general',
+          created_at: project.created_at,
+          last_modified: project.last_modified,
+          tags: [],
+          settings: {
+            outline_enabled: true,
+            timeline_enabled: true,
+            auto_save_interval: project.settings.auto_save_interval,
+            editor_theme: project.settings.editor_theme,
+            font_size: project.settings.font_size,
+            line_height: project.settings.line_height,
+            font_family: 'system-ui',
+          },
+        },
+        documents: [],
+      };
+    }
+    return await handleTauriCall<BookData>('create_book', { name, description, author, genre });
   }
 
   /**
    * 列出所有书籍
    */
   static async listBooks(): Promise<BookConfig[]> {
+    if (!isTauriEnvironment()) {
+      const projects = await WebFileSystemAdapter.listProjects();
+      return projects.map(project => ({
+        id: project.id,
+        name: project.name,
+        description: project.description,
+        author: project.author,
+        genre: 'general',
+        created_at: project.created_at,
+        last_modified: project.last_modified,
+        tags: [],
+        settings: {
+          outline_enabled: true,
+          timeline_enabled: true,
+          auto_save_interval: project.settings.auto_save_interval,
+          editor_theme: project.settings.editor_theme,
+          font_size: project.settings.font_size,
+          line_height: project.settings.line_height,
+          font_family: project.settings.font_family,
+        },
+      }));
+    }
     return await handleTauriCall<BookConfig[]>('list_books');
   }
 
@@ -325,6 +406,35 @@ export class FileSystemService {
    * 加载书籍数据
    */
   static async loadBook(bookId: string): Promise<BookData> {
+    if (!isTauriEnvironment()) {
+      const project = await WebFileSystemAdapter.loadProject(bookId);
+      if (!project) {
+        throw new Error(`Book with ID ${bookId} not found`);
+      }
+      const documents = await WebFileSystemAdapter.listDocuments(bookId);
+      return {
+        config: {
+          id: project.id,
+          name: project.name,
+          description: project.description,
+          author: project.author,
+          genre: 'general',
+          created_at: project.created_at,
+          last_modified: project.last_modified,
+          tags: [],
+          settings: {
+            outline_enabled: true,
+            timeline_enabled: true,
+            auto_save_interval: project.settings.auto_save_interval,
+            editor_theme: project.settings.editor_theme,
+            font_size: project.settings.font_size,
+            line_height: project.settings.line_height,
+            font_family: project.settings.font_family,
+          },
+        },
+        documents,
+      };
+    }
     return await handleTauriCall<BookData>('load_book', { bookId });
   }
 
@@ -332,6 +442,28 @@ export class FileSystemService {
    * 保存书籍数据
    */
   static async saveBook(bookData: BookData): Promise<void> {
+    if (!isTauriEnvironment()) {
+      const project: ProjectConfig = {
+        id: bookData.config.id,
+        name: bookData.config.name,
+        description: bookData.config.description,
+        author: bookData.config.author,
+        created_at: bookData.config.created_at,
+        last_modified: new Date().toISOString(),
+        version: '1.0.0',
+        settings: {
+          auto_save_interval: bookData.config.settings.auto_save_interval,
+          auto_commit_threshold: 100,
+          backup_enabled: true,
+          backup_interval: 300,
+          editor_theme: bookData.config.settings.editor_theme,
+          font_size: bookData.config.settings.font_size,
+          line_height: bookData.config.settings.line_height,
+          font_family: bookData.config.settings.font_family,
+        },
+      };
+      return await WebFileSystemAdapter.saveProject(project);
+    }
     return await handleTauriCall<void>('save_book', { bookData });
   }
 
@@ -339,6 +471,9 @@ export class FileSystemService {
    * 删除书籍
    */
   static async deleteBook(bookId: string): Promise<void> {
+    if (!isTauriEnvironment()) {
+      return await WebFileSystemAdapter.deleteProject(bookId);
+    }
     return await handleTauriCall<void>('delete_book', { bookId });
   }
 
@@ -352,21 +487,30 @@ export class FileSystemService {
     title: string,
     docType: string
   ): Promise<DocumentConfig> {
-    return await invoke('create_document', { bookId, title, docType });
+    if (!isTauriEnvironment()) {
+      return await WebFileSystemAdapter.createDocument(bookId, title, docType);
+    }
+    return await handleTauriCall<DocumentConfig>('create_document', { bookId, title, docType });
   }
 
   /**
    * 列出书籍的所有文档
    */
   static async listDocuments(bookId: string): Promise<DocumentConfig[]> {
-    return await invoke('list_documents', { bookId });
+    if (!isTauriEnvironment()) {
+      return await WebFileSystemAdapter.listDocuments(bookId);
+    }
+    return await handleTauriCall<DocumentConfig[]>('list_documents', { bookId });
   }
 
   /**
    * 加载文档内容
    */
   static async loadDocument(bookId: string, documentId: string): Promise<string> {
-    return await invoke('load_document', { bookId, documentId });
+    if (!isTauriEnvironment()) {
+      return await WebFileSystemAdapter.loadDocument(bookId, documentId);
+    }
+    return await handleTauriCall<string>('load_document', { bookId, documentId });
   }
 
   /**
@@ -377,14 +521,29 @@ export class FileSystemService {
     documentId: string,
     content: string
   ): Promise<void> {
-    return await invoke('save_document', { bookId, documentId, content });
+    if (!isTauriEnvironment()) {
+      return await WebFileSystemAdapter.saveDocument(bookId, documentId, content);
+    }
+    return await handleTauriCall<void>('save_document', { bookId, documentId, content });
   }
 
   /**
    * 删除文档
    */
   static async deleteDocument(bookId: string, documentId: string): Promise<void> {
-    return await invoke('delete_document', { bookId, documentId });
+    if (!isTauriEnvironment()) {
+      // Web 环境下删除文档
+      const documents = await WebFileSystemAdapter.listDocuments(bookId);
+      const filteredDocs = documents.filter(d => d.id !== documentId);
+      const documentKey = `branchwrite_documents_${bookId}`;
+      localStorage.setItem(documentKey, JSON.stringify(filteredDocs));
+
+      // 删除文档内容
+      const contentKey = `branchwrite_content_${bookId}_${documentId}`;
+      localStorage.removeItem(contentKey);
+      return;
+    }
+    return await handleTauriCall<void>('delete_document', { bookId, documentId });
   }
 }
 

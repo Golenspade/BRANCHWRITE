@@ -3,6 +3,7 @@ import { useAppStore } from '../stores/appStore';
 import { AdvancedEditor } from './AdvancedEditor';
 import { VersionManager } from './VersionManager';
 import { VersionDiff } from './VersionDiff';
+import { TimelineView } from './TimelineView';
 
 // 文档列表组件
 function DocumentList({ 
@@ -243,6 +244,7 @@ export function BookWorkspace() {
   const [documentContent, setDocumentContent] = useState('');
   const [showVersionManager, setShowVersionManager] = useState(false);
   const [showVersionDiff, setShowVersionDiff] = useState(false);
+  const [showTimelineView, setShowTimelineView] = useState(false);
   const [selectedCommitsForDiff, setSelectedCommitsForDiff] = useState<string[]>([]);
   const [showDevHint, setShowDevHint] = useState(true);
 
@@ -547,6 +549,20 @@ export function BookWorkspace() {
               >
                 📝 版本管理
               </button>
+
+              <button
+                onClick={() => setShowTimelineView(true)}
+                style={{
+                  padding: '0.5rem',
+                  backgroundColor: 'transparent',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.375rem',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem'
+                }}
+              >
+                📈 时间线
+              </button>
             </>
           )}
 
@@ -671,6 +687,15 @@ export function BookWorkspace() {
             setShowVersionDiff(false);
             setSelectedCommitsForDiff([]);
           }}
+        />
+      )}
+
+      {/* 时间线视图 */}
+      {showTimelineView && documentManager && (
+        <TimelineView
+          documentManager={documentManager}
+          isOpen={showTimelineView}
+          onClose={() => setShowTimelineView(false)}
         />
       )}
     </div>

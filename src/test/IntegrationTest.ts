@@ -4,6 +4,7 @@
  */
 
 import { FileSystemService } from '../services/fileSystemService';
+import { TimelineTest } from './TimelineTest';
 import type { BookConfig, BookData, DocumentConfig } from '../services/fileSystemService';
 
 export class IntegrationTest {
@@ -21,7 +22,8 @@ export class IntegrationTest {
       await this.testBookManagement();
       await this.testDocumentManagement();
       await this.testFileOperations();
-      
+      await this.testTimelineFunctionality();
+
       console.log('✅ 所有集成测试通过！');
     } catch (error) {
       console.error('❌ 集成测试失败:', error);
@@ -270,6 +272,21 @@ export class IntegrationTest {
       console.log('✅ 错误处理测试通过');
     } catch (error) {
       console.error('❌ 错误处理测试失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 测试时间线功能
+   */
+  static async testTimelineFunctionality(): Promise<void> {
+    console.log('🧪 开始测试时间线功能...');
+
+    try {
+      await TimelineTest.runAllTests();
+      console.log('✅ 时间线功能测试通过');
+    } catch (error) {
+      console.error('❌ 时间线功能测试失败:', error);
       throw error;
     }
   }

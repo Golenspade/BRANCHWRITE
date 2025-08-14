@@ -5,6 +5,29 @@ import { IntegrationTestRunner } from './components/IntegrationTestRunner';
 import { ExportTest } from './components/ExportTest';
 import { useAppStore } from './stores/appStore';
 
+// 环境检测
+const isTauriEnvironment = () => {
+  return typeof window !== 'undefined' && '__TAURI__' in window;
+};
+
+// 环境提示组件
+const EnvironmentBanner = () => {
+  if (isTauriEnvironment()) return null;
+
+  return (
+    <div style={{
+      backgroundColor: '#3b82f6',
+      color: 'white',
+      padding: '0.75rem 1rem',
+      textAlign: 'center',
+      fontSize: '0.875rem',
+      borderBottom: '1px solid #e5e7eb'
+    }}>
+      🌐 当前运行在 Web 环境 | 完整功能请使用: <code style={{backgroundColor: 'rgba(255,255,255,0.2)', padding: '0.25rem 0.5rem', borderRadius: '0.25rem'}}>npm run tauri dev</code>
+    </div>
+  );
+};
+
 function App() {
   console.log('🚀 App: 组件开始渲染');
 
@@ -158,19 +181,27 @@ function App() {
   if (showBookSelector) {
     console.log('📚 App: 显示书本选择器');
     return (
-      <BookSelector
-        onBookSelected={(bookId) => {
-          console.log('🎯 App: 用户选择了书本 ->', bookId);
-          selectBook(bookId);
-        }}
-      />
+      <>
+        <EnvironmentBanner />
+        <BookSelector
+          onBookSelected={(bookId) => {
+            console.log('🎯 App: 用户选择了书本 ->', bookId);
+            selectBook(bookId);
+          }}
+        />
+      </>
     );
   }
 
   // 显示书本工作区
   if (currentBook) {
     console.log('✏️ App: 显示书本工作区，书本ID:', currentBook.config.id);
-    return <BookWorkspace />;
+    return (
+      <>
+        <EnvironmentBanner />
+        <BookWorkspace />
+      </>
+    );
   }
   if(currentBook === null) {
     console.log('❌ App: 书本数据为空，显示错误界面');
