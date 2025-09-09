@@ -85,6 +85,30 @@ npm run tauri build
 - **Markdown**: marked
 - **版本管理**: 自实现的 Git 风格系统
 
+
+## 🕒 时间线（Timeline）
+
+- 当前状态
+  - 已实现：
+    - 从提交历史构建时间线（节点/连接/分支）并以 SVG 渲染
+    - 平移、缩放、节点点击/双击、背景点击、网格显示/隐藏
+    - 基础搜索（按消息/标签/分支），统计信息（总节点/分支、时间跨度、日均提交）
+  - 待完善（MVP 路线）：
+    - 视图：一键缩放至全图（fit to bounds）、tooltip 悬浮信息、键盘导航、多选
+    - 联动：双击打开版本详情、右键 Diff、回滚到某提交并与文档管理联动
+    - 持久化：Web 端 localStorage、Tauri 端文件读写，初始化加载与操作后的延迟写入
+    - 搜索/筛选：时间范围、分支过滤与视图高亮聚焦
+
+- 相关代码
+  - 模型：`src/models/TimelineManager.ts`
+  - 类型：`src/types/timeline.ts`
+  - 组件：`src/components/Timeline.tsx`（渲染）、`src/components/TimelineControls.tsx`（控制面板）、`src/components/TimelineView.tsx`（容器）
+  - 演示与测试：`src/components/TimelineDemo.tsx`、`src/test/TimelineTest.ts`
+
+- 路线图与待办
+  - 详见 `todolist.md` 中“最小持久化”“Phase 1 时间线 MVP”等条目
+
+
 ## 📖 文档
 
 - [功能特性详解](./FEATURES.md)

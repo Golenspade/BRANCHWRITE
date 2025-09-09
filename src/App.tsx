@@ -67,22 +67,48 @@ function App() {
   // 添加键盘快捷键监听器（开发模式）
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Ctrl+Shift+T 打开/关闭测试界面
-      if (event.ctrlKey && event.shiftKey && event.key === 'T') {
+      const isMod = event.ctrlKey || event.metaKey; // 支持 Ctrl 或 Cmd
+      // Mod(CTRL/CMD)+Shift+T 打开/关闭测试界面
+      if (isMod && event.shiftKey && event.code === 'KeyT') {
         event.preventDefault();
         setShowTestRunner(prev => !prev);
         console.log('🧪 App: 切换测试界面显示状态');
       }
-      // Ctrl+Shift+E 打开/关闭导出测试界面
-      if (event.ctrlKey && event.shiftKey && event.key === 'E') {
+      // Mod(CTRL/CMD)+Shift+E 打开/关闭导出测试界面
+      if (isMod && event.shiftKey && event.code === 'KeyE') {
         event.preventDefault();
         setShowExportTest(prev => !prev);
         console.log('📤 App: 切换导出测试界面显示状态');
+      }
+      // 备用快捷键：F8 打开/关闭测试界面（避免系统冲突）
+      if (event.code === 'F8') {
+        event.preventDefault();
+        setShowTestRunner(prev => !prev);
+        console.log('🧪 App: F8 切换测试界面显示状态');
+      }
+      // 备用快捷键：F9 打开/关闭导出测试界面（避免系统冲突）
+      if (event.code === 'F9') {
+        event.preventDefault();
+        setShowExportTest(prev => !prev);
+        console.log('📤 App: F9 切换导出测试界面显示状态');
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // 支持通过 URL 参数 ?export=1 自动打开导出测试界面
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('export') === '1') {
+        setShowExportTest(true);
+        console.log('📤 App: 通过 URL 参数自动打开导出测试界面');
+      }
+    } catch (e) {
+      // ignore
+    }
   }, []);
 
   useEffect(() => {

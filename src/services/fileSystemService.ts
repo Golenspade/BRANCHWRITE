@@ -197,14 +197,14 @@ export class FileSystemService {
    * 保存项目
    */
   static async saveProject(projectData: ProjectData): Promise<void> {
-    return await handleTauriCall<void>('save_project', { projectData });
+    return await handleTauriCall<void>('save_project', { project_data: projectData });
   }
 
   /**
    * 加载项目
    */
   static async loadProject(projectId: string): Promise<ProjectData> {
-    return await handleTauriCall<ProjectData>('load_project', { projectId });
+    return await handleTauriCall<ProjectData>('load_project', { project_id: projectId });
   }
 
   /**
@@ -218,21 +218,21 @@ export class FileSystemService {
    * 删除项目
    */
   static async deleteProject(projectId: string): Promise<void> {
-    return await handleTauriCall<void>('delete_project', { projectId });
+    return await handleTauriCall<void>('delete_project', { project_id: projectId });
   }
 
   /**
    * 导出项目
    */
   static async exportProject(projectId: string, exportPath: string): Promise<void> {
-    return await handleTauriCall<void>('export_project', { projectId, exportPath });
+    return await handleTauriCall<void>('export_project', { project_id: projectId, export_path: exportPath });
   }
 
   /**
    * 获取项目统计信息
    */
   static async getProjectStats(projectId: string): Promise<Record<string, any>> {
-    return await handleTauriCall<Record<string, any>>('get_project_stats', { projectId });
+    return await handleTauriCall<Record<string, any>>('get_project_stats', { project_id: projectId });
   }
 
   /**
