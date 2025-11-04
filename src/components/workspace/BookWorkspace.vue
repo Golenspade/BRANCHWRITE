@@ -29,7 +29,7 @@
           </template>
           保存
         </n-button>
-        <n-button>
+        <n-button @click="handleExport">
           <template #icon>
             <n-icon>
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -73,10 +73,14 @@
         </div>
       </aside>
     </main>
+
+    <!-- 导出对话框 -->
+    <ExportDialog v-model:show="showExportDialog" />
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '../../stores/app'
@@ -84,10 +88,13 @@ import EditorPane from './EditorPane.vue'
 import VersionPanel from './VersionPanel.vue'
 import TimelinePanel from './TimelinePanel.vue'
 import DocumentList from './DocumentList.vue'
+import ExportDialog from './ExportDialog.vue'
 
 const router = useRouter()
 const app = useAppStore()
 const { currentBook, currentDocumentConfig } = storeToRefs(app)
+
+const showExportDialog = ref(false)
 
 const goBack = () => {
   router.push('/')
@@ -106,6 +113,10 @@ const onRevert = async (_commitId: string, content: string) => {
   if (!bookId || !docId) return
   app.setCurrentDocument(content)
   await app.saveDocumentContent(bookId, docId, content)
+}
+
+const handleExport = () => {
+  showExportDialog.value = true
 }
 
 const showStats = () => {

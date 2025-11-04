@@ -23,7 +23,11 @@ import {
   NFormItem,
   NInputGroup,
   NPopconfirm,
-  NMessageProvider
+  NMessageProvider,
+  NRadio,
+  NRadioGroup,
+  NCheckbox,
+  NCheckboxGroup
 } from 'naive-ui'
 
 const naive = create({
@@ -44,7 +48,11 @@ const naive = create({
     NFormItem,
     NInputGroup,
     NPopconfirm,
-    NMessageProvider
+    NMessageProvider,
+    NRadio,
+    NRadioGroup,
+    NCheckbox,
+    NCheckboxGroup
   ]
 })
 

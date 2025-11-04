@@ -229,6 +229,56 @@ export class FileSystemService {
   }
 
   /**
+   * 导出文档为文件
+   */
+  static async exportDocument(
+    filename: string,
+    content: string,
+    format: string = 'markdown'
+  ): Promise<void> {
+    if (!isTauriEnvironment()) {
+      // Web 环境使用浏览器下载
+      return await WebFileSystemAdapter.exportDocument(filename, content, format);
+    }
+
+    // Tauri 环境使用原生文件保存对话框
+    try {
+      const { save } = await import('@tauri-apps/plugin-dialog');
+      
+      // 设置文件过滤器
+      const ext = format === 'markdown' ? 'md' : 'txt';
+      const filters = [{
+        name: format === 'markdown' ? 'Markdown' : 'Text',
+        extensions: [ext]
+      }];
+
+      // 获取默认保存路径（用户文档目录）
+      let defaultPath = filename;
+      try {
+        const documentsDir = await FileSystemService.getDocumentsDir();
+        defaultPath = `${documentsDir}/${filename}`;
+      } catch (e) {
+        console.log('无法获取文档目录，使用默认文件名');
+      }
+
+      // 显示保存对话框
+      const filePath = await save({
+        defaultPath,
+        filters
+      });
+
+      if (filePath) {
+        // 保存文件
+        await FileSystemService.writeFile(filePath, content);
+        console.log('✅ 文件已保存到:', filePath);
+      }
+    } catch (error) {
+      console.error('❌ 导出失败:', error);
+      throw new Error('导出文件失败');
+    }
+  }
+
+  /**
    * 获取项目统计信息
    */
   static async getProjectStats(projectId: string): Promise<Record<string, any>> {
