@@ -24,9 +24,14 @@ export class WebFileSystemAdapter {
    */
   static getStoredProjects(): ProjectConfig[] {
     try {
+      console.log('💾 WebAdapter: 读取 localStorage key:', STORAGE_KEY)
       const stored = localStorage.getItem(STORAGE_KEY);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
+      console.log('💾 WebAdapter: localStorage 原始数据:', stored)
+      const projects = stored ? JSON.parse(stored) : [];
+      console.log('💾 WebAdapter: 解析后的项目数量:', projects.length)
+      return projects;
+    } catch (error) {
+      console.error('💾 WebAdapter: 读取 localStorage 失败:', error)
       return [];
     }
   }
@@ -82,7 +87,11 @@ export class WebFileSystemAdapter {
    * 获取项目列表（Web 版本）
    */
   static async listProjects(): Promise<ProjectConfig[]> {
-    return this.getStoredProjects();
+    console.log('💾 WebAdapter: listProjects 被调用')
+    const projects = this.getStoredProjects();
+    console.log('💾 WebAdapter: 从 localStorage 读取到', projects.length, '个项目')
+    console.log('💾 WebAdapter: 项目列表:', projects)
+    return projects;
   }
 
   /**
@@ -145,26 +154,28 @@ export class WebFileSystemAdapter {
     title: string,
     docType: string
   ): Promise<DocumentConfig> {
+    console.log('💾 WebAdapter: 开始创建文档', { projectId, title, docType })
     const documents = await this.listDocuments(projectId);
+    console.log('💾 WebAdapter: 当前文档数量', documents.length)
     
     const newDocument: DocumentConfig = {
       id: `doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      book_id: projectId,
       title,
-      doc_type: docType,
+      order: documents.length + 1,
+      type: docType,
       created_at: new Date().toISOString(),
       last_modified: new Date().toISOString(),
       word_count: 0,
       character_count: 0,
-      version: 1,
       status: 'draft',
-      tags: [],
-      metadata: {},
     };
 
     documents.unshift(newDocument);
     
     const documentKey = `branchwrite_documents_${projectId}`;
     localStorage.setItem(documentKey, JSON.stringify(documents));
+    console.log('💾 WebAdapter: 文档已保存到 localStorage', documentKey)
     
     return newDocument;
   }

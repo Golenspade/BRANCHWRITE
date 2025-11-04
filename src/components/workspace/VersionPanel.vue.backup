@@ -1,0 +1,376 @@
+<template>
+  <div class="h-full bg-white flex flex-col">
+    <!-- 版本面板头部 -->
+    <div class="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
+      <div class="flex items-center gap-2">
+        <h3 class="text-lg font-semibold text-gray-900">版本历史</h3>
+        <span class="text-xs px-2 py-1 bg-blue-100 text-blue-600 rounded-full">
+          {{ commits.length }} 个版本
+        </span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button
+          @click="createCommit"
+          class="px-3 py-1 text-xs bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+        >
+          📝 提交
+        </button>
+        <button
+          @click="diffSelected"
+          :disabled="selectedIds.length !== 2"
+          class="px-3 py-1 text-xs bg-green-500 text-white rounded-md hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+        >
+          🔄 对比
+        </button>
+        <button
+          @click="$emit('close')"
+          class="p-1 text-gray-400 hover:text-gray-600 rounded"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+
+    <!-- 版本列表 -->
+    <div class="flex-1 overflow-auto">
+      <div v-if="commits.length === 0" class="p-6 text-center text-gray-500">
+        <div class="text-3xl mb-3">📝</div>
+        <p class="text-sm mb-2">还没有版本记录</p>
+        <p class="text-xs text-gray-400">编辑文档时会自动创建版本</p>
+      </div>
+
+      <div v-else class="p-3">
+        <div
+          v-for="(commit, index) in commits"
+          :key="commit.id"
+          :class="[
+            'mb-3 p-3 rounded-lg border-l-4 transition-all duration-200',
+            index === 0 ? 'border-l-blue-500 bg-blue-50' : 'border-l-gray-300 bg-white hover:bg-gray-50',
+            'shadow-sm hover:shadow-md'
+          ]"
+        >
+          <!-- 版本头部 -->
+          <div class="flex items-start justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <input
+                type="checkbox"
+                :value="commit.id"
+                v-model="selectedIds"
+                class="h-4 w-4 text-blue-600 rounded focus:ring-blue-500"
+              />
+              <div class="flex items-center gap-2">
+                <span :class="[
+                  'text-xs px-2 py-1 rounded-full',
+                  index === 0 ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-gray-100 text-gray-600'
+                ]">
+                  {{ index === 0 ? '当前' : `v${commits.length - index}` }}
+                </span>
+                <span
+                  v-if="commit.isAutoCommit"
+                  class="text-xs px-2 py-1 rounded-full bg-green-100 text-green-600 border border-green-200"
+                >
+                  自动
+                </span>
+              </div>
+            </div>
+            <span class="text-xs text-gray-400">
+              {{ formatTimeAgo(commit.timestamp) }}
+            </span>
+          </div>
+
+          <!-- 版本信息 -->
+          <div class="mb-2">
+            <p class="text-sm font-medium text-gray-900 mb-1">
+              {{ commit.message || '无标题提交' }}
+            </p>
+            <p class="text-xs text-gray-500">
+              {{ formatDateTime(commit.timestamp) }} • ID: {{ commit.id.slice(-8) }}
+            </p>
+          </div>
+
+          <!-- 版本操作 -->
+          <div class="flex justify-between items-center">
+            <div class="text-xs text-gray-500">
+              {{ getVersionWordCount(commit.id) }} 字
+            </div>
+            <div class="flex items-center gap-1">
+              <button
+                @click="handleViewVersion(commit)"
+                class="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded hover:bg-gray-200 transition-colors"
+              >
+                查看
+              </button>
+              <button
+                v-if="index !== 0"
+                @click="handleRevertToVersion(commit)"
+                class="px-2 py-1 text-xs bg-orange-100 text-orange-600 rounded hover:bg-orange-200 transition-colors"
+              >
+                回滚
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 对比结果显示区域（双色 Diff） -->
+    <div v-if="diffChanges.length" class="border-t bg-gray-50 p-3 max-h-56 overflow-auto">
+      <div class="flex justify-between items-center mb-2">
+        <div class="flex items-center gap-3">
+          <h4 class="text-sm font-medium text-gray-900">版本对比结果</h4>
+          <div class="text-xs text-gray-500">
+            <span class="px-2 py-0.5 rounded bg-green-100 text-green-700 border border-green-200 mr-1">+{{ diffStats.added }}</span>
+            <span class="px-2 py-0.5 rounded bg-red-100 text-red-700 border border-red-200">-{{ diffStats.removed }}</span>
+          </div>
+        </div>
+        <button
+          @click="clearDiff"
+          class="text-xs text-gray-500 hover:text-gray-700"
+        >
+          关闭
+        </button>
+      </div>
+      <div class="bg-white border rounded overflow-hidden">
+        <div v-for="(c, idx) in diffChanges" :key="idx"
+             :class="[
+               'text-xs font-mono px-2 py-1 border-b last:border-b-0',
+               c.type === 'added' ? 'bg-green-50 text-green-800 border-green-100' :
+               c.type === 'removed' ? 'bg-red-50 text-red-800 border-red-100' :
+               'text-gray-700'
+             ]">
+          <span v-if="c.type==='added'" class="mr-2 text-green-600">+ </span>
+          <span v-else-if="c.type==='removed'" class="mr-2 text-red-600">- </span>
+          <span v-else class="mr-2 text-gray-400">· </span>
+          <span class="whitespace-pre-wrap">{{ c.value }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 版本操作面板 -->
+    <div class="border-t bg-gray-50 p-3">
+      <div class="text-xs text-gray-500 mb-2">快速操作</div>
+      <div class="flex gap-2">
+        <button
+          @click="handleAutoSave"
+          :disabled="!hasUnsavedChanges"
+          :class="[
+            'flex-1 px-3 py-2 text-xs rounded-md transition-colors',
+            hasUnsavedChanges
+              ? 'bg-green-500 text-white hover:bg-green-600'
+              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+          ]"
+        >
+          保存当前版本
+        </button>
+        <button
+          @click="clearSelected"
+          :disabled="selectedIds.length === 0"
+          class="px-3 py-2 text-xs bg-gray-200 text-gray-600 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          清除选择
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 版本详情弹窗 -->
+  <div
+    v-if="showVersionDetail"
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+    @click="closeVersionDetail"
+  >
+    <div
+      class="bg-white rounded-lg shadow-2xl w-[80vw] h-[80vh] flex flex-col"
+      @click.stop
+    >
+      <!-- 弹窗头部 -->
+      <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+        <div>
+          <h3 class="text-lg font-semibold">版本详情</h3>
+          <p class="text-sm text-gray-500" v-if="selectedCommit">
+            {{ selectedCommit.message }} - {{ formatDateTime(selectedCommit.timestamp) }}
+          </p>
+        </div>
+        <button
+          @click="closeVersionDetail"
+          class="p-2 text-gray-400 hover:text-gray-600 rounded"
+        >
+          ✕
+        </button>
+      </div>
+
+      <!-- 版本内容 -->
+      <div class="flex-1 p-4 overflow-auto">
+        <div class="bg-gray-50 border rounded-lg p-4 h-full">
+          <pre class="whitespace-pre-wrap text-sm text-gray-700 font-mono">{{ selectedVersionContent }}</pre>
+        </div>
+      </div>
+
+      <!-- 弹窗底部操作 -->
+      <div class="p-4 border-t border-gray-200 flex justify-end gap-2">
+        <button
+          @click="closeVersionDetail"
+          class="px-4 py-2 text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200"
+        >
+          关闭
+        </button>
+        <button
+          v-if="selectedCommit && commits[0]?.id !== selectedCommit.id"
+          @click="confirmRevertToVersion(selectedCommit)"
+          class="px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600"
+        >
+          回滚到此版本
+        </button>
+
+const diffChanges = ref<any[]>([])
+const diffStats = computed(() => {
+  if (!diffChanges.value.length) return { added: 0, removed: 0, unchanged: 0 }
+  return new DiffEngine().getDiffStats(diffChanges.value)
+})
+
+function clearDiff() {
+  diffChanges.value = []
+}
+
+        >
+          回滚到此版本
+        </button>
+      </div>
+    </div>
+
+const diffChanges = ref<any[]>([])
+const diffStats = computed(() => {
+  if (!diffChanges.value.length) return { added: 0, removed: 0, unchanged: 0 }
+  return new DiffEngine().getDiffStats(diffChanges.value)
+})
+
+function clearDiff() {
+  diffChanges.value = []
+}
+
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useAppStore } from '../../stores/app'
+import { DiffEngine } from '../../models/DiffEngine'
+import type { CommitInfo } from '../../types/index'
+
+interface Emits {
+  (e: 'close'): void
+  (e: 'revert', commitId: string, content: string): void
+}
+
+const emit = defineEmits<Emits>()
+
+const app = useAppStore()
+const { commits, currentDocument, commitData } = storeToRefs(app)
+const selectedIds = ref<string[]>([])
+const diffText = ref('')
+
+// 版本详情弹窗状态
+const showVersionDetail = ref(false)
+const selectedCommit = ref<CommitInfo | null>(null)
+const selectedVersionContent = ref('')
+
+const engine = new DiffEngine()
+
+// 计算属性
+const hasUnsavedChanges = computed(() => {
+  if (commits.value.length === 0) return currentDocument.value.length > 0
+  const latestCommit = commits.value[0]
+  const latestContent = commitData.value[latestCommit.id] || ''
+  return currentDocument.value !== latestContent
+})
+
+// 格式化时间
+const formatTimeAgo = (timestamp: number) => {
+  const now = Date.now()
+  const diff = now - timestamp
+  const minutes = Math.floor(diff / (1000 * 60))
+  const hours = Math.floor(diff / (1000 * 60 * 60))
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+
+  if (minutes < 1) return '刚才'
+  if (minutes < 60) return `${minutes}分钟前`
+  if (hours < 24) return `${hours}小时前`
+  return `${days}天前`
+}
+
+const formatDateTime = (timestamp: number) => {
+  return new Date(timestamp).toLocaleString('zh-CN')
+}
+
+// 获取版本字数
+const getVersionWordCount = (commitId: string) => {
+  const content = commitData.value[commitId] || ''
+  return content.trim().split(/\s+/).filter(word => word.length > 0).length
+}
+
+function createCommit() {
+  const message = prompt('请输入版本描述：')
+  if (message && message.trim()) {
+    app.createCommit(message.trim())
+  } else {
+    app.createCommit('手动提交')
+  }
+}
+
+function getSnapshot(commitId: string): string {
+  const d = app.getCommitDiff(commitId)
+  return d?.content || ''
+}
+
+function diffSelected() {
+  if (selectedIds.value.length !== 2) return
+  const [a, b] = selectedIds.value
+  const oldText = getSnapshot(a)
+  const newText = getSnapshot(b)
+  const result = engine.diff(oldText, newText)
+  diffChanges.value = result.changes
+}
+
+// 查看版本详情
+const handleViewVersion = (commit: CommitInfo) => {
+  selectedCommit.value = commit
+  selectedVersionContent.value = commitData.value[commit.id] || '内容不可用'
+  showVersionDetail.value = true
+}
+
+// 关闭版本详情
+const closeVersionDetail = () => {
+  showVersionDetail.value = false
+  selectedCommit.value = null
+  selectedVersionContent.value = ''
+}
+
+// 回滚到指定版本
+const handleRevertToVersion = (commit: CommitInfo) => {
+  if (window.confirm(`确定要回滚到版本"${commit.message}"吗？当前未保存的更改将会丢失。`)) {
+    const content = commitData.value[commit.id] || ''
+    emit('revert', commit.id, content)
+  }
+}
+
+// 从弹窗确认回滚
+const confirmRevertToVersion = (commit: CommitInfo) => {
+  closeVersionDetail()
+  handleRevertToVersion(commit)
+}
+
+// 自动保存当前版本
+const handleAutoSave = () => {
+  if (hasUnsavedChanges.value) {
+    app.createCommit('自动保存')
+  }
+}
+
+// 清除选择
+const clearSelected = () => {
+  selectedIds.value = []
+  diffText.value = ''
+}
+</script>
+

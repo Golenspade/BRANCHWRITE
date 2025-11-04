@@ -10,7 +10,7 @@ let tauriInvoke: any = null;
 
 const getTauriInvoke = async () => {
   if (!isTauriEnvironment()) {
-    throw new Error('Tauri API is not available in web environment');
+    throw new Error('This application requires Tauri (desktop) environment.');
   }
 
   if (!tauriInvoke) {
@@ -377,9 +377,12 @@ export class FileSystemService {
    * 列出所有书籍
    */
   static async listBooks(): Promise<BookConfig[]> {
+    console.log('🌐 FileSystemService: listBooks 被调用')
     if (!isTauriEnvironment()) {
+      console.log('🌐 FileSystemService: 使用 Web 环境')
       const projects = await WebFileSystemAdapter.listProjects();
-      return projects.map(project => ({
+      console.log('🌐 FileSystemService: WebAdapter 返回', projects.length, '个项目')
+      const books = projects.map(project => ({
         id: project.id,
         name: project.name,
         description: project.description,
@@ -398,7 +401,10 @@ export class FileSystemService {
           font_family: project.settings.font_family,
         },
       }));
+      console.log('🌐 FileSystemService: 转换后返回', books.length, '本书')
+      return books;
     }
+    console.log('🖥️  FileSystemService: 使用 Tauri 环境')
     return await handleTauriCall<BookConfig[]>('list_books');
   }
 
@@ -488,8 +494,10 @@ export class FileSystemService {
     docType: string
   ): Promise<DocumentConfig> {
     if (!isTauriEnvironment()) {
+      console.log('🌐 FileSystemService: 使用 Web 环境（localStorage）')
       return await WebFileSystemAdapter.createDocument(bookId, title, docType);
     }
+    console.log('🖥️  FileSystemService: 使用 Tauri 环境（文件系统）')
     return await handleTauriCall<DocumentConfig>('create_document', { bookId, title, docType });
   }
 

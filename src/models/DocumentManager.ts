@@ -107,8 +107,8 @@ export class DocumentManager {
       // 获取最后一次提交的字数
       let lastWordCount = 0;
       if (this.commitHistory.length > 0) {
-        const lastCommit = this.commitHistory[this.commitHistory.length - 1];
-        const lastDoc = this.getDocumentAtCommit(lastCommit.id);
+        const lastCommitId = this.commitHistory[this.commitHistory.length - 1];
+        const lastDoc = this.getDocumentAtCommit(lastCommitId);
         if (lastDoc) {
           const lastText = lastDoc.getText();
           lastWordCount = lastText.trim().split(/\s+/).filter(word => word.length > 0).length;

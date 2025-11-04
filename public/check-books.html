@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>检查书籍数据</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 1000px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+    .section {
+      margin: 20px 0;
+      padding: 15px;
+      background: #f9f9f9;
+      border-radius: 4px;
+    }
+    button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    pre {
+      background: #2d2d2d;
+      color: #f8f8f2;
+      padding: 15px;
+      border-radius: 4px;
+      overflow-x: auto;
+      max-height: 400px;
+    }
+    .info {
+      padding: 10px;
+      background: #e3f2fd;
+      border-left: 4px solid #2196F3;
+      border-radius: 4px;
+      margin: 10px 0;
+    }
+    .success {
+      background: #e8f5e9;
+      border-left-color: #4CAF50;
+    }
+    .warning {
+      background: #fff3e0;
+      border-left-color: #ff9800;
+    }
+    .error {
+      background: #ffebee;
+      border-left-color: #f44336;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📚 检查书籍数据</h1>
+    
+    <div class="section">
+      <h2>LocalStorage 状态</h2>
+      <button onclick="checkStorage()">检查存储</button>
+      <button onclick="showAllKeys()">显示所有键</button>
+      <div id="storageStatus"></div>
+    </div>
+
+    <div class="section">
+      <h2>书籍列表</h2>
+      <button onclick="showBooks()">显示书籍</button>
+      <button onclick="createTestBook()">创建测试书籍</button>
+      <div id="booksResult"></div>
+    </div>
+
+    <div class="section">
+      <h2>原始数据</h2>
+      <button onclick="showRawData()">显示原始数据</button>
+      <div id="rawData"></div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'branchwrite_projects';
+
+    function checkStorage() {
+      const statusDiv = document.getElementById('storageStatus');
+      
+      try {
+        // 检查 localStorage 是否可用
+        localStorage.setItem('test', 'test');
+        localStorage.removeItem('test');
+        
+        const stored = localStorage.getItem(STORAGE_KEY);
+        
+        if (!stored) {
+          statusDiv.innerHTML = `
+            <div class="info warning">
+              ⚠️ LocalStorage 可用，但没有找到书籍数据<br>
+              键名: ${STORAGE_KEY}<br>
+              值: null
+            </div>
+          `;
+        } else {
+          const projects = JSON.parse(stored);
+          statusDiv.innerHTML = `
+            <div class="info success">
+              ✅ LocalStorage 可用<br>
+              键名: ${STORAGE_KEY}<br>
+              书籍数量: ${projects.length}<br>
+              数据大小: ${stored.length} 字符
+            </div>
+          `;
+        }
+      } catch (error) {
+        statusDiv.innerHTML = `
+          <div class="info error">
+            ❌ LocalStorage 检查失败<br>
+            错误: ${error.message}
+          </div>
+        `;
+      }
+    }
+
+    function showAllKeys() {
+      const statusDiv = document.getElementById('storageStatus');
+      const keys = [];
+      
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key.startsWith('branchwrite_')) {
+          keys.push(key);
+        }
+      }
+      
+      statusDiv.innerHTML = `
+        <div class="info">
+          📋 找到 ${keys.length} 个相关键:<br>
+          ${keys.map(k => `• ${k}`).join('<br>')}
+        </div>
+      `;
+    }
+
+    function showBooks() {
+      const booksDiv = document.getElementById('booksResult');
+      
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        
+        if (!stored) {
+          booksDiv.innerHTML = `
+            <div class="info warning">
+              ⚠️ 没有找到书籍数据
+            </div>
+          `;
+          return;
+        }
+        
+        const projects = JSON.parse(stored);
+        
+        if (projects.length === 0) {
+          booksDiv.innerHTML = `
+            <div class="info warning">
+              ⚠️ 书籍列表为空
+            </div>
+          `;
+          return;
+        }
+        
+        const booksList = projects.map((book, index) => `
+          <div style="margin: 10px 0; padding: 10px; background: white; border-radius: 4px;">
+            <strong>${index + 1}. ${book.name}</strong><br>
+            ID: ${book.id}<br>
+            作者: ${book.author}<br>
+            描述: ${book.description}<br>
+            创建时间: ${new Date(book.created_at).toLocaleString()}
+          </div>
+        `).join('');
+        
+        booksDiv.innerHTML = `
+          <div class="info success">
+            ✅ 找到 ${projects.length} 本书籍
+          </div>
+          ${booksList}
+        `;
+      } catch (error) {
+        booksDiv.innerHTML = `
+          <div class="info error">
+            ❌ 读取书籍失败: ${error.message}
+          </div>
+        `;
+      }
+    }
+
+    function createTestBook() {
+      try {
+        const projects = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        
+        const newBook = {
+          id: `project_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          name: '测试书籍 ' + new Date().toLocaleTimeString(),
+          description: '这是一个测试书籍',
+          author: '测试作者',
+          created_at: new Date().toISOString(),
+          last_modified: new Date().toISOString(),
+          version: '1.0.0',
+          settings: {
+            auto_save_interval: 30,
+            auto_commit_threshold: 100,
+            backup_enabled: true,
+            backup_interval: 300,
+            editor_theme: 'default',
+            font_size: 14,
+            line_height: 1.5,
+            font_family: 'system-ui',
+          },
+        };
+
+        projects.unshift(newBook);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+        
+        alert('✅ 测试书籍创建成功！');
+        showBooks();
+      } catch (error) {
+        alert('❌ 创建失败: ' + error.message);
+      }
+    }
+
+    function showRawData() {
+      const rawDiv = document.getElementById('rawData');
+      
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        
+        if (!stored) {
+          rawDiv.innerHTML = `
+            <div class="info warning">
+              ⚠️ 没有数据
+            </div>
+          `;
+          return;
+        }
+        
+        const projects = JSON.parse(stored);
+        
+        rawDiv.innerHTML = `
+          <pre>${JSON.stringify(projects, null, 2)}</pre>
+        `;
+      } catch (error) {
+        rawDiv.innerHTML = `
+          <div class="info error">
+            ❌ 显示失败: ${error.message}
+          </div>
+        `;
+      }
+    }
+
+    // 页面加载时自动检查
+    window.onload = function() {
+      checkStorage();
+      showBooks();
+    };
+  </script>
+</body>
+</html>

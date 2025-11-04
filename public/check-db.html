@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>数据库检查 - BranchWrite</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: #252526;
+      border-radius: 8px;
+      padding: 30px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+    
+    h1 {
+      color: #4ec9b0;
+      margin-bottom: 20px;
+      font-size: 24px;
+    }
+    
+    h2 {
+      color: #569cd6;
+      margin: 20px 0 10px;
+      font-size: 18px;
+    }
+    
+    .section {
+      background: #1e1e1e;
+      padding: 15px;
+      border-radius: 4px;
+      margin-bottom: 15px;
+      border-left: 3px solid #007acc;
+    }
+    
+    .item {
+      margin-bottom: 15px;
+      padding: 10px;
+      background: #2d2d30;
+      border-radius: 4px;
+    }
+    
+    .key {
+      color: #9cdcfe;
+      font-weight: bold;
+    }
+    
+    .value {
+      color: #ce9178;
+      margin-left: 10px;
+    }
+    
+    .number {
+      color: #b5cea8;
+    }
+    
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-top: 20px;
+    }
+    
+    .stat-card {
+      background: #2d2d30;
+      padding: 15px;
+      border-radius: 4px;
+      text-align: center;
+    }
+    
+    .stat-value {
+      font-size: 32px;
+      font-weight: bold;
+      color: #4ec9b0;
+      margin: 10px 0;
+    }
+    
+    .stat-label {
+      color: #858585;
+      font-size: 14px;
+    }
+    
+    button {
+      background: #0e639c;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-right: 10px;
+      margin-bottom: 10px;
+    }
+    
+    button:hover {
+      background: #1177bb;
+    }
+    
+    button.danger {
+      background: #c5302f;
+    }
+    
+    button.danger:hover {
+      background: #e81123;
+    }
+    
+    pre {
+      background: #1e1e1e;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-size: 12px;
+    }
+    
+    .empty {
+      color: #858585;
+      font-style: italic;
+      text-align: center;
+      padding: 40px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 BranchWrite 数据库检查</h1>
+    
+    <div style="margin-bottom: 20px;">
+      <button onclick="checkDatabase()">🔄 刷新数据</button>
+      <button onclick="exportData()">📥 导出数据</button>
+      <button class="danger" onclick="clearData()">🗑️ 清空数据</button>
+    </div>
+    
+    <div id="output"></div>
+  </div>
+
+  <script>
+    function checkDatabase() {
+      const output = document.getElementById('output');
+      output.innerHTML = '';
+      
+      const keys = Object.keys(localStorage);
+      const branchwriteKeys = keys.filter(k => k.startsWith('branchwrite_'));
+      
+      if (branchwriteKeys.length === 0) {
+        output.innerHTML = '<div class="empty">❌ 没有找到任何数据</div>';
+        return;
+      }
+      
+      // 统计信息
+      const stats = getStatistics();
+      output.innerHTML += `
+        <h2>📊 数据统计</h2>
+        <div class="stats">
+          <div class="stat-card">
+            <div class="stat-label">书籍数量</div>
+            <div class="stat-value">${stats.totalBooks}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">文档数量</div>
+            <div class="stat-value">${stats.totalDocs}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">总字数</div>
+            <div class="stat-value">${stats.totalWords.toLocaleString()}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">存储使用</div>
+            <div class="stat-value">${stats.storageUsed}</div>
+          </div>
+        </div>
+      `;
+      
+      // 书籍列表
+      const projectsData = localStorage.getItem('branchwrite_projects');
+      if (projectsData) {
+        const projects = JSON.parse(projectsData);
+        
+        output.innerHTML += '<h2>📚 书籍列表</h2>';
+        
+        projects.forEach((project, index) => {
+          const docsKey = `branchwrite_documents_${project.id}`;
+          const docsData = localStorage.getItem(docsKey);
+          const docs = docsData ? JSON.parse(docsData) : [];
+          
+          let html = `
+            <div class="section">
+              <div class="item">
+                <div><span class="key">${index + 1}. ${project.name}</span></div>
+                <div style="margin-left: 20px; margin-top: 10px; color: #858585;">
+                  <div>ID: ${project.id}</div>
+                  <div>作者: ${project.author || '未知'}</div>
+                  <div>描述: ${project.description || '无'}</div>
+                  <div>创建: ${new Date(project.created_at).toLocaleString('zh-CN')}</div>
+                  <div>修改: ${new Date(project.last_modified).toLocaleString('zh-CN')}</div>
+                </div>
+              </div>
+          `;
+          
+          if (docs.length > 0) {
+            html += '<div style="margin-left: 20px;">';
+            html += '<div style="color: #569cd6; margin: 10px 0;">📄 文档列表:</div>';
+            docs.forEach((doc, docIndex) => {
+              const contentKey = `branchwrite_content_${project.id}_${doc.id}`;
+              const content = localStorage.getItem(contentKey) || '';
+              
+              html += `
+                <div class="item" style="margin-bottom: 10px;">
+                  <div><span class="key">${docIndex + 1}. ${doc.title}</span></div>
+                  <div style="margin-left: 20px; margin-top: 5px; color: #858585; font-size: 12px;">
+                    <div>类型: ${doc.type} | 状态: ${doc.status}</div>
+                    <div>字数: ${doc.word_count || 0} | 字符: ${doc.character_count || 0}</div>
+                    <div>内容长度: ${content.length} 字符</div>
+                    <div>创建: ${new Date(doc.created_at).toLocaleString('zh-CN')}</div>
+                  </div>
+                  ${content ? `<pre style="margin-top: 10px;">${content.substring(0, 200)}${content.length > 200 ? '...' : ''}</pre>` : ''}
+                </div>
+              `;
+            });
+            html += '</div>';
+          } else {
+            html += '<div style="margin-left: 20px; color: #858585; font-style: italic;">暂无文档</div>';
+          }
+          
+          html += '</div>';
+          output.innerHTML += html;
+        });
+      }
+      
+      // 原始数据
+      output.innerHTML += '<h2>🔑 所有存储键</h2>';
+      output.innerHTML += '<div class="section">';
+      branchwriteKeys.forEach(key => {
+        const value = localStorage.getItem(key);
+        const size = ((key.length + (value?.length || 0)) * 2 / 1024).toFixed(2);
+        output.innerHTML += `<div class="item"><span class="key">${key}</span> <span class="value">(${size} KB)</span></div>`;
+      });
+      output.innerHTML += '</div>';
+    }
+    
+    function getStatistics() {
+      const projectsData = localStorage.getItem('branchwrite_projects');
+      const projects = projectsData ? JSON.parse(projectsData) : [];
+      
+      let totalDocs = 0;
+      let totalWords = 0;
+      let totalChars = 0;
+      let totalSize = 0;
+      
+      projects.forEach(project => {
+        const docsKey = `branchwrite_documents_${project.id}`;
+        const docsData = localStorage.getItem(docsKey);
+        if (docsData) {
+          const docs = JSON.parse(docsData);
+          totalDocs += docs.length;
+          docs.forEach(doc => {
+            totalWords += doc.word_count || 0;
+            totalChars += doc.character_count || 0;
+          });
+        }
+      });
+      
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('branchwrite_')) {
+          const value = localStorage.getItem(key);
+          totalSize += (key.length + (value?.length || 0)) * 2;
+        }
+      });
+      
+      return {
+        totalBooks: projects.length,
+        totalDocs,
+        totalWords,
+        totalChars,
+        storageUsed: (totalSize / 1024).toFixed(2) + ' KB'
+      };
+    }
+    
+    function exportData() {
+      const data = {};
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('branchwrite_')) {
+          data[key] = localStorage.getItem(key);
+        }
+      });
+      
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `branchwrite-backup-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      
+      alert('✅ 数据已导出');
+    }
+    
+    function clearData() {
+      if (!confirm('⚠️ 确定要清空所有数据吗？此操作不可撤销！')) {
+        return;
+      }
+      
+      if (!confirm('⚠️⚠️ 再次确认：这将删除所有书籍和文档！')) {
+        return;
+      }
+      
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('branchwrite_')) {
+          localStorage.removeItem(key);
+        }
+      });
+      
+      alert('✅ 数据已清空');
+      checkDatabase();
+    }
+    
+    // 页面加载时自动检查
+    checkDatabase();
+  </script>
+</body>
+</html>
