@@ -91,7 +91,10 @@ onMounted(async () => {
       'redo',
       '|',
       'fullscreen',
-      'outline',
+      {
+        name: 'outline',
+        tip: '大纲',
+      },
       'export',
     ],
     upload: {
@@ -122,7 +125,7 @@ onMounted(async () => {
       },
     },
     outline: {
-      enable: true,
+      enable: false,
       position: 'right',
     },
     counter: {

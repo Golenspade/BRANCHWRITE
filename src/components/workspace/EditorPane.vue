@@ -177,7 +177,7 @@ const documentDraft = ref('')
 const monacoRef = ref<{ undo: () => void; redo: () => void; focus: () => void } | null>(null)
 
 const hasDocument = computed(() => !!currentDocumentConfig.value)
-const stats = computed(() => computeTextStats(currentDocument.value || ''))
+const stats = computed(() => computeTextStats(documentDraft.value || currentDocument.value || ''))
 
 const themeOptions = allEditorThemes.map((t) => ({
   label: t.name,
