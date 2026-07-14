@@ -1,15 +1,15 @@
 <template>
-  <div class="diff-pane h-full flex flex-col min-h-0">
+  <div class="diff-pane h-full flex flex-col min-h-0" data-testid="diff-pane">
     <div class="flex items-center justify-between px-3 py-2 border-b bg-gray-50 text-sm">
       <span class="text-gray-600">
         对比：
-        <strong>{{ compareLabel }}</strong>
+        <strong data-testid="diff-compare-label">{{ compareLabel }}</strong>
         → 当前内容
       </span>
       <n-space :size="8">
-        <n-tag size="small" type="error">−{{ removedCount }}</n-tag>
-        <n-tag size="small" type="success">+{{ addedCount }}</n-tag>
-        <n-tag size="small">{{ unchangedCount }} 未变</n-tag>
+        <n-tag size="small" type="error" data-testid="diff-removed-count">−{{ removedCount }}</n-tag>
+        <n-tag size="small" type="success" data-testid="diff-added-count">+{{ addedCount }}</n-tag>
+        <n-tag size="small" data-testid="diff-unchanged-count">{{ unchangedCount }} 未变</n-tag>
       </n-space>
     </div>
 

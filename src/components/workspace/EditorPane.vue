@@ -2,10 +2,10 @@
   <n-card class="h-full flex flex-col editor-card" :bordered="false" content-style="padding: 0; flex: 1; display: flex; flex-direction: column; min-height: 0;">
     <template #header>
       <div class="flex items-center justify-between gap-3 flex-wrap">
-        <n-radio-group v-model:value="mode" size="small" name="editor-mode">
-          <n-radio-button value="edit">编辑</n-radio-button>
-          <n-radio-button value="preview">预览</n-radio-button>
-          <n-radio-button value="diff" :disabled="!canDiff">对比</n-radio-button>
+        <n-radio-group v-model:value="mode" size="small" name="editor-mode" data-testid="editor-mode-group">
+          <n-radio-button value="edit" data-testid="mode-edit">编辑</n-radio-button>
+          <n-radio-button value="preview" data-testid="mode-preview">预览</n-radio-button>
+          <n-radio-button value="diff" :disabled="!canDiff" data-testid="mode-diff">对比</n-radio-button>
         </n-radio-group>
 
         <n-space :size="8" align="center">
@@ -15,18 +15,25 @@
             :options="themeOptions"
             size="small"
             style="width: 140px"
+            data-testid="editor-theme"
             @update:value="applyTheme"
           />
           <n-button v-if="mode === 'edit'" size="small" @click="undo" :disabled="!hasDocument">撤销</n-button>
           <n-button v-if="mode === 'edit'" size="small" @click="redo" :disabled="!hasDocument">重做</n-button>
-          <n-button size="small" type="primary" :disabled="!hasDocument" @click="saveVersion">
+          <n-button
+            size="small"
+            type="primary"
+            :disabled="!hasDocument"
+            data-testid="save-version"
+            @click="saveVersion"
+          >
             保存版本
           </n-button>
         </n-space>
       </div>
     </template>
 
-    <div v-if="!hasDocument" class="flex-1 flex items-center justify-center text-gray-400">
+    <div v-if="!hasDocument" class="flex-1 flex items-center justify-center text-gray-400" data-testid="editor-empty">
       <div class="text-center px-6">
         <div class="text-4xl mb-3">📝</div>
         <p class="text-base text-gray-600 mb-1">选择或创建文档开始写作</p>
@@ -34,21 +41,22 @@
       </div>
     </div>
 
-    <div v-show="hasDocument" class="flex-1 flex flex-col min-h-0">
-      <div v-show="mode === 'edit'" class="flex-1 min-h-0 relative">
-        <div ref="editorEl" class="absolute inset-0"></div>
+    <div v-show="hasDocument" class="flex-1 flex flex-col min-h-0" data-testid="editor-workspace">
+      <div v-show="mode === 'edit'" class="flex-1 min-h-0 relative" data-testid="editor-edit-pane">
+        <div ref="editorEl" class="absolute inset-0" data-testid="monaco-host"></div>
       </div>
 
-      <div v-show="mode === 'preview'" class="flex-1 min-h-0 overflow-hidden">
+      <div v-show="mode === 'preview'" class="flex-1 min-h-0 overflow-hidden" data-testid="editor-preview-pane">
         <n-scrollbar class="h-full">
           <article
             class="preview-body prose prose-slate max-w-none px-6 py-4"
+            data-testid="markdown-preview"
             v-html="previewHtml"
           />
         </n-scrollbar>
       </div>
 
-      <div v-show="mode === 'diff'" class="flex-1 min-h-0 overflow-hidden">
+      <div v-show="mode === 'diff'" class="flex-1 min-h-0 overflow-hidden" data-testid="editor-diff-pane">
         <DiffPane
           :old-text="compareText"
           :new-text="currentDocument"
@@ -56,7 +64,10 @@
         />
       </div>
 
-      <footer class="status-bar flex items-center justify-between gap-3 px-3 py-1.5 border-t bg-white text-xs text-gray-500">
+      <footer
+        class="status-bar flex items-center justify-between gap-3 px-3 py-1.5 border-t bg-white text-xs text-gray-500"
+        data-testid="editor-status-bar"
+      >
         <div class="flex items-center gap-3 min-w-0">
           <span>行 {{ cursor.line }}，列 {{ cursor.column }}</span>
           <span class="truncate">{{ currentDocumentConfig?.title }}</span>
@@ -166,7 +177,10 @@ watch(mode, async (value) => {
 })
 
 watch(currentDocumentConfig, async (doc) => {
-  if (!doc || !editor) return
+  if (!doc) return
+  await ensureEditor()
+  if (!editor) return
+
   const bookId = currentBook.value?.config.id
   if (!bookId) return
 
@@ -191,55 +205,17 @@ watch(currentDocument, (value) => {
   }
 })
 
+watch(hasDocument, async (ready) => {
+  if (ready) {
+    await ensureEditor()
+  }
+})
+
 onMounted(async () => {
-  if (!editorEl.value) return
-
-  registerCustomThemes(monaco)
-  registerMarkdownExtras(monaco)
-
-  const theme = getThemeById(themeId.value)
-  editor = monaco.editor.create(editorEl.value, {
-    value: currentDocument.value || '',
-    language: 'markdown',
-    theme: theme?.monacoTheme || 'vs',
-    automaticLayout: true,
-    minimap: { enabled: false },
-    fontSize: 16,
-    lineHeight: 28,
-    fontFamily: "'JetBrains Mono', 'Fira Code', 'Source Han Sans SC', 'PingFang SC', monospace",
-    wordWrap: 'on',
-    padding: { top: 16, bottom: 16 },
-    scrollBeyondLastLine: false,
-    mouseWheelZoom: true,
-    smoothScrolling: true,
-    renderWhitespace: 'selection',
-    folding: true,
-    find: {
-      seedSearchStringFromSelection: 'always',
-      autoFindInSelection: 'never',
-      addExtraSpaceOnTop: true,
-    },
-  })
-
-  editor.onDidChangeModelContent(() => {
-    if (applyingExternal || !editor) return
-    const text = editor.getValue()
-    app.setCurrentDocument(text)
-    scheduleSave()
-  })
-
-  editor.onDidChangeCursorPosition((e) => {
-    cursor.value = {
-      line: e.position.lineNumber,
-      column: e.position.column,
-    }
-  })
-
-  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-    void saveVersion()
-  })
-
   window.addEventListener('keydown', handleGlobalShortcuts)
+  if (hasDocument.value) {
+    await ensureEditor()
+  }
 })
 
 onBeforeUnmount(() => {
@@ -248,6 +224,63 @@ onBeforeUnmount(() => {
   editor?.dispose()
   editor = null
 })
+
+async function ensureEditor() {
+  await nextTick()
+  if (editor || !editorEl.value) return
+
+  try {
+    registerCustomThemes(monaco)
+    registerMarkdownExtras(monaco)
+
+    const theme = getThemeById(themeId.value)
+    editor = monaco.editor.create(editorEl.value, {
+      value: currentDocument.value || '',
+      language: 'markdown',
+      theme: theme?.monacoTheme || 'vs',
+      automaticLayout: true,
+      minimap: { enabled: false },
+      fontSize: 16,
+      lineHeight: 28,
+      fontFamily: "'JetBrains Mono', 'Fira Code', 'Source Han Sans SC', 'PingFang SC', monospace",
+      wordWrap: 'on',
+      padding: { top: 16, bottom: 16 },
+      scrollBeyondLastLine: false,
+      mouseWheelZoom: true,
+      smoothScrolling: true,
+      renderWhitespace: 'selection',
+      folding: true,
+      find: {
+        seedSearchStringFromSelection: 'always',
+        autoFindInSelection: 'never',
+        addExtraSpaceOnTop: true,
+      },
+    })
+
+    editor.onDidChangeModelContent(() => {
+      if (applyingExternal || !editor) return
+      const text = editor.getValue()
+      app.setCurrentDocument(text)
+      scheduleSave()
+    })
+
+    editor.onDidChangeCursorPosition((e) => {
+      cursor.value = {
+        line: e.position.lineNumber,
+        column: e.position.column,
+      }
+    })
+
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+      void saveVersion()
+    })
+
+    // 容器刚从隐藏变为可见时，强制重新布局
+    requestAnimationFrame(() => editor?.layout())
+  } catch (error) {
+    console.error('Monaco 初始化失败:', error)
+  }
+}
 
 function handleGlobalShortcuts(event: KeyboardEvent) {
   const isMod = event.ctrlKey || event.metaKey

@@ -1,7 +1,7 @@
 <template>
   <n-card title="文档列表" class="h-full flex flex-col" :bordered="false">
     <template #header-extra>
-      <n-button size="small" type="primary" @click="handleShowCreateDialog">
+      <n-button size="small" type="primary" data-testid="create-doc-btn" @click="handleShowCreateDialog">
         <template #icon>
           <n-icon>
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -115,6 +115,10 @@ const handleCreateDocument = async (title: string, type: string) => {
     const result = await app.createDocument(bookId, title, type)
     console.log('✅ 文档创建成功:', result)
     console.log('📄 更新后的文档列表:', documents.value)
+    const created = documents.value.find((d) => d.id === result) || documents.value[documents.value.length - 1]
+    if (created) {
+      app.selectDocument(created)
+    }
     showCreateDialog.value = false
   } catch (error) {
     console.error('❌ 创建文档失败:', error)
