@@ -21,11 +21,29 @@ async function createBookAndChapter(page: Page) {
   await page.getByTestId('submit-doc-btn').click()
 
   await expect(page.getByTestId('editor-workspace')).toBeVisible()
-  await expect(page.getByTestId('monaco-host')).toBeVisible()
-  await expect(page.locator('.monaco-editor').first()).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByTestId('wysiwyg-pane')).toBeVisible()
+  await expect(page.locator('.vditor-ir').first()).toBeVisible({ timeout: 20_000 })
+}
+
+async function typeInWysiwyg(page: Page, text: string) {
+  await expect(page.locator('.vditor-ir').first()).toBeVisible({ timeout: 20_000 })
+  await page.waitForFunction(() => !!(window as unknown as { __branchwriteVditor?: { setValue: (v: string) => void } }).__branchwriteVditor)
+  await page.evaluate((value) => {
+    const api = (window as unknown as { __branchwriteVditor?: { setValue: (v: string, clearStack?: boolean) => void } }).__branchwriteVditor
+    api?.setValue(value, true)
+  }, text)
+  // 等 v-model 同步进 Pinia
+  await expect.poll(async () => {
+    return page.evaluate(() => {
+      const api = (window as unknown as { __branchwriteVditor?: { getValue: () => string } }).__branchwriteVditor
+      return api?.getValue() ?? ''
+    })
+  }).toContain(text.slice(0, Math.min(8, text.length)))
 }
 
 async function typeInMonaco(page: Page, text: string) {
+  await page.getByTestId('mode-source').click()
+  await expect(page.getByTestId('editor-source-pane')).toBeVisible()
   const editor = page.locator('.monaco-editor').first()
   await expect(editor).toBeVisible({ timeout: 15_000 })
   await editor.click()
@@ -40,30 +58,37 @@ test.describe('编辑器 WebView E2E', () => {
     })
   })
 
-  test('创建书籍与文档后可进入编辑器', async ({ page }) => {
+  test('创建书籍与文档后进入所见即所得写作模式', async ({ page }) => {
     await createBookAndChapter(page)
     await expect(page.getByTestId('editor-status-bar')).toContainText('第一章')
-    await expect(page.getByTestId('mode-edit')).toBeVisible()
+    await expect(page.getByTestId('mode-wysiwyg')).toBeVisible()
+    await expect(page.getByTestId('wysiwyg-host')).toBeVisible()
   })
 
-  test('支持输入、预览切换与状态栏统计', async ({ page }) => {
+  test('所见即所得可输入并切换到只读预览', async ({ page }) => {
     await createBookAndChapter(page)
 
-    await typeInMonaco(page, '# 标题\n\n这是一段测试正文 hello')
+    await typeInWysiwyg(page, '这是一段测试正文 hello')
     await expect(page.getByTestId('editor-status-bar')).toContainText('字符')
 
     await page.getByTestId('mode-preview').click()
     await expect(page.getByTestId('editor-preview-pane')).toBeVisible()
     await expect(page.getByTestId('markdown-preview')).toContainText('这是一段测试正文 hello')
 
-    await page.getByTestId('mode-edit').click()
-    await expect(page.getByTestId('editor-edit-pane')).toBeVisible()
+    await page.getByTestId('mode-wysiwyg').click()
+    await expect(page.getByTestId('editor-wysiwyg-pane')).toBeVisible()
+  })
+
+  test('源码模式 Monaco 仍可用', async ({ page }) => {
+    await createBookAndChapter(page)
+    await typeInMonaco(page, '## 源码模式内容')
+    await expect(page.getByTestId('editor-status-bar')).toContainText('字符')
   })
 
   test('保存版本后可进入 Diff 对比', async ({ page }) => {
     await createBookAndChapter(page)
 
-    await typeInMonaco(page, '第一版内容')
+    await typeInWysiwyg(page, '第一版内容')
 
     page.once('dialog', async (dialog) => {
       expect(dialog.type()).toBe('prompt')
@@ -73,7 +98,7 @@ test.describe('编辑器 WebView E2E', () => {
 
     await expect(page.getByRole('listitem').getByText('初始版本')).toBeVisible()
 
-    await typeInMonaco(page, '第二版内容（已修改）')
+    await typeInWysiwyg(page, '第二版内容（已修改）')
 
     await page.getByTestId('mode-diff').click()
     await expect(page.getByTestId('editor-diff-pane')).toBeVisible()
@@ -83,15 +108,15 @@ test.describe('编辑器 WebView E2E', () => {
     await expect(page.getByTestId('diff-removed-count')).toBeVisible()
   })
 
-  test('快捷键可切换预览模式', async ({ page }) => {
+  test('快捷键可切换到预览模式', async ({ page }) => {
     await createBookAndChapter(page)
-    await typeInMonaco(page, '## 快捷键预览')
+    await typeInWysiwyg(page, '## 快捷键预览')
 
-    await page.keyboard.press('ControlOrMeta+Digit2')
+    await page.keyboard.press('ControlOrMeta+Digit3')
     await expect(page.getByTestId('editor-preview-pane')).toBeVisible()
     await expect(page.getByTestId('markdown-preview')).toContainText('快捷键预览')
 
     await page.keyboard.press('ControlOrMeta+Digit1')
-    await expect(page.getByTestId('editor-edit-pane')).toBeVisible()
+    await expect(page.getByTestId('editor-wysiwyg-pane')).toBeVisible()
   })
 })

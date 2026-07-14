@@ -10,7 +10,7 @@ export const useAppStore = defineStore('app', () => {
   const isHistoryPanelOpen = ref(false)
   const isDiffViewOpen = ref(false)
   const selectedCommits = ref<string[]>([])
-  const currentMode = ref<'edit' | 'preview' | 'diff'>('edit')
+  const currentMode = ref<'wysiwyg' | 'source' | 'preview' | 'diff' | 'edit'>('wysiwyg')
   const isLoading = ref(false)
   const error = ref<string | null>(null)
   const commits = ref<CommitInfo[]>([])
@@ -47,8 +47,8 @@ export const useAppStore = defineStore('app', () => {
     currentDocument.value = content
   }
 
-  const setCurrentMode = (mode: 'edit' | 'preview' | 'diff') => {
-    currentMode.value = mode
+  const setCurrentMode = (mode: 'wysiwyg' | 'source' | 'preview' | 'diff' | 'edit') => {
+    currentMode.value = mode === 'edit' ? 'wysiwyg' : mode
   }
 
   const setSelectedCommits = (ids: string[]) => {

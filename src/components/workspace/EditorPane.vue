@@ -1,25 +1,43 @@
 <template>
-  <n-card class="h-full flex flex-col editor-card" :bordered="false" content-style="padding: 0; flex: 1; display: flex; flex-direction: column; min-height: 0;">
+  <n-card
+    class="h-full flex flex-col editor-card"
+    :bordered="false"
+    content-style="padding: 0; flex: 1; display: flex; flex-direction: column; min-height: 0;"
+  >
     <template #header>
       <div class="flex items-center justify-between gap-3 flex-wrap">
         <n-radio-group v-model:value="mode" size="small" name="editor-mode" data-testid="editor-mode-group">
-          <n-radio-button value="edit" data-testid="mode-edit">编辑</n-radio-button>
+          <n-radio-button value="wysiwyg" data-testid="mode-wysiwyg">写作</n-radio-button>
+          <n-radio-button value="source" data-testid="mode-source">源码</n-radio-button>
           <n-radio-button value="preview" data-testid="mode-preview">预览</n-radio-button>
           <n-radio-button value="diff" :disabled="!canDiff" data-testid="mode-diff">对比</n-radio-button>
         </n-radio-group>
 
         <n-space :size="8" align="center">
           <n-select
-            v-if="mode === 'edit'"
+            v-if="mode === 'source'"
             v-model:value="themeId"
             :options="themeOptions"
             size="small"
             style="width: 140px"
             data-testid="editor-theme"
-            @update:value="applyTheme"
           />
-          <n-button v-if="mode === 'edit'" size="small" @click="undo" :disabled="!hasDocument">撤销</n-button>
-          <n-button v-if="mode === 'edit'" size="small" @click="redo" :disabled="!hasDocument">重做</n-button>
+          <n-button
+            v-if="mode === 'source'"
+            size="small"
+            :disabled="!hasDocument"
+            @click="monacoRef?.undo()"
+          >
+            撤销
+          </n-button>
+          <n-button
+            v-if="mode === 'source'"
+            size="small"
+            :disabled="!hasDocument"
+            @click="monacoRef?.redo()"
+          >
+            重做
+          </n-button>
           <n-button
             size="small"
             type="primary"
@@ -33,20 +51,51 @@
       </div>
     </template>
 
-    <div v-if="!hasDocument" class="flex-1 flex items-center justify-center text-gray-400" data-testid="editor-empty">
+    <div
+      v-if="!hasDocument"
+      class="flex-1 flex items-center justify-center text-gray-400"
+      data-testid="editor-empty"
+    >
       <div class="text-center px-6">
         <div class="text-4xl mb-3">📝</div>
         <p class="text-base text-gray-600 mb-1">选择或创建文档开始写作</p>
-        <p class="text-xs">快捷键：Ctrl/⌘+S 保存版本 · Ctrl/⌘+1/2/3 切换模式 · Ctrl/⌘+F 搜索</p>
+        <p class="text-xs">
+          快捷键：Ctrl/⌘+S 保存版本 · Ctrl/⌘+1 写作 · Ctrl/⌘+2 源码 · Ctrl/⌘+3 预览 · Ctrl/⌘+4 对比
+        </p>
       </div>
     </div>
 
     <div v-show="hasDocument" class="flex-1 flex flex-col min-h-0" data-testid="editor-workspace">
-      <div v-show="mode === 'edit'" class="flex-1 min-h-0 relative" data-testid="editor-edit-pane">
-        <div ref="editorEl" class="absolute inset-0" data-testid="monaco-host"></div>
+      <div
+        v-show="mode === 'wysiwyg'"
+        class="flex-1 min-h-0 overflow-hidden"
+        data-testid="editor-wysiwyg-pane"
+      >
+        <WysiwygPane
+          v-if="wysiwygMounted"
+          v-model="documentDraft"
+          @ready="onWysiwygReady"
+        />
       </div>
 
-      <div v-show="mode === 'preview'" class="flex-1 min-h-0 overflow-hidden" data-testid="editor-preview-pane">
+      <div
+        v-if="mode === 'source'"
+        class="flex-1 min-h-0"
+        data-testid="editor-source-pane"
+      >
+        <MonacoSourcePane
+          ref="monacoRef"
+          v-model="documentDraft"
+          :theme-id="themeId"
+          @cursor="onCursor"
+        />
+      </div>
+
+      <div
+        v-show="mode === 'preview'"
+        class="flex-1 min-h-0 overflow-hidden"
+        data-testid="editor-preview-pane"
+      >
         <n-scrollbar class="h-full">
           <article
             class="preview-body prose prose-slate max-w-none px-6 py-4"
@@ -56,7 +105,11 @@
         </n-scrollbar>
       </div>
 
-      <div v-show="mode === 'diff'" class="flex-1 min-h-0 overflow-hidden" data-testid="editor-diff-pane">
+      <div
+        v-show="mode === 'diff'"
+        class="flex-1 min-h-0 overflow-hidden"
+        data-testid="editor-diff-pane"
+      >
         <DiffPane
           :old-text="compareText"
           :new-text="currentDocument"
@@ -69,7 +122,10 @@
         data-testid="editor-status-bar"
       >
         <div class="flex items-center gap-3 min-w-0">
-          <span>行 {{ cursor.line }}，列 {{ cursor.column }}</span>
+          <span v-if="mode === 'source'">行 {{ cursor.line }}，列 {{ cursor.column }}</span>
+          <span v-else-if="mode === 'wysiwyg'">所见即所得</span>
+          <span v-else-if="mode === 'preview'">预览</span>
+          <span v-else>对比</span>
           <span class="truncate">{{ currentDocumentConfig?.title }}</span>
           <span v-if="saveState === 'saving'" class="text-blue-500">保存中…</span>
           <span v-else-if="saveState === 'saved'" class="text-green-600">已自动保存</span>
@@ -86,24 +142,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { marked } from 'marked'
-import * as monaco from 'monaco-editor/esm/vs/editor/editor.api'
-import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import { useMessage } from 'naive-ui'
 import { useAppStore } from '../../stores/app'
-import { allEditorThemes, getThemeById, registerCustomThemes } from '../../utils/editorThemes'
+import { allEditorThemes } from '../../utils/editorThemes'
 import { computeTextStats } from '../../utils/textStats'
 import DiffPane from './DiffPane.vue'
+import WysiwygPane from './WysiwygPane.vue'
+import MonacoSourcePane from './MonacoSourcePane.vue'
 
-type EditorMode = 'edit' | 'preview' | 'diff'
-
-;(globalThis as typeof globalThis & { MonacoEnvironment?: { getWorker: () => Worker } }).MonacoEnvironment = {
-  getWorker() {
-    return new editorWorker()
-  },
-}
+type EditorMode = 'wysiwyg' | 'source' | 'preview' | 'diff'
 
 const app = useAppStore()
 const message = useMessage()
@@ -115,16 +165,16 @@ const {
   currentMode,
 } = storeToRefs(app)
 
-const editorEl = ref<HTMLDivElement | null>(null)
-let editor: monaco.editor.IStandaloneCodeEditor | null = null
 let saveTimer: number | null = null
 let applyingExternal = false
-let markdownExtrasRegistered = false
 
-const mode = ref<EditorMode>('edit')
+const mode = ref<EditorMode>('wysiwyg')
 const themeId = ref('focus-writing')
 const cursor = ref({ line: 1, column: 1 })
 const saveState = ref<'idle' | 'saving' | 'saved'>('idle')
+const wysiwygMounted = ref(false)
+const documentDraft = ref('')
+const monacoRef = ref<{ undo: () => void; redo: () => void; focus: () => void } | null>(null)
 
 const hasDocument = computed(() => !!currentDocumentConfig.value)
 const stats = computed(() => computeTextStats(currentDocument.value || ''))
@@ -141,7 +191,6 @@ const compareCommit = computed(() => {
     const id = app.selectedCommits[0]
     return commits.value.find((c) => c.id === id) || commits.value[0] || null
   }
-  // 默认与最近一次非当前快照对比：取最新提交
   return commits.value[0] || null
 })
 
@@ -162,24 +211,32 @@ const previewHtml = computed(() => {
 })
 
 watch(currentMode, (value) => {
-  if (value === 'edit' || value === 'preview' || value === 'diff') {
+  if (value === 'wysiwyg' || value === 'source' || value === 'preview' || value === 'diff') {
     mode.value = value
+  } else if (value === 'edit') {
+    mode.value = 'wysiwyg'
   }
 })
 
-watch(mode, async (value) => {
+watch(mode, (value) => {
   app.setCurrentMode(value)
-  if (value === 'edit') {
-    await nextTick()
-    editor?.layout()
-    editor?.focus()
+  if (value === 'wysiwyg' || value === 'source') {
+    documentDraft.value = currentDocument.value || ''
   }
+})
+
+watch(documentDraft, (value) => {
+  if (mode.value !== 'wysiwyg' && mode.value !== 'source') return
+  if (value === currentDocument.value) return
+  app.setCurrentDocument(value)
+  scheduleSave()
 })
 
 watch(currentDocumentConfig, async (doc) => {
-  if (!doc) return
-  await ensureEditor()
-  if (!editor) return
+  if (!doc) {
+    wysiwygMounted.value = false
+    return
+  }
 
   const bookId = currentBook.value?.config.id
   if (!bookId) return
@@ -188,98 +245,49 @@ watch(currentDocumentConfig, async (doc) => {
   try {
     const content = await app.loadDocumentContent(bookId, doc.id)
     app.setCurrentDocument(content || '')
-    editor.setValue(content || '')
+    documentDraft.value = content || ''
   } finally {
     applyingExternal = false
   }
+
+  wysiwygMounted.value = true
 })
 
 watch(currentDocument, (value) => {
-  if (!editor || applyingExternal) return
-  if (editor.getValue() !== value) {
-    applyingExternal = true
-    const position = editor.getPosition()
-    editor.setValue(value || '')
-    if (position) editor.setPosition(position)
-    applyingExternal = false
+  if (applyingExternal) return
+  if (documentDraft.value !== value) {
+    documentDraft.value = value || ''
   }
 })
 
-watch(hasDocument, async (ready) => {
-  if (ready) {
-    await ensureEditor()
+watch(hasDocument, (ready) => {
+  if (!ready) {
+    wysiwygMounted.value = false
+    return
   }
+  wysiwygMounted.value = true
+  documentDraft.value = currentDocument.value || ''
 })
 
-onMounted(async () => {
+onMounted(() => {
   window.addEventListener('keydown', handleGlobalShortcuts)
   if (hasDocument.value) {
-    await ensureEditor()
+    wysiwygMounted.value = true
+    documentDraft.value = currentDocument.value || ''
   }
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleGlobalShortcuts)
   if (saveTimer) window.clearTimeout(saveTimer)
-  editor?.dispose()
-  editor = null
 })
 
-async function ensureEditor() {
-  await nextTick()
-  if (editor || !editorEl.value) return
+function onWysiwygReady() {
+  documentDraft.value = currentDocument.value || ''
+}
 
-  try {
-    registerCustomThemes(monaco)
-    registerMarkdownExtras(monaco)
-
-    const theme = getThemeById(themeId.value)
-    editor = monaco.editor.create(editorEl.value, {
-      value: currentDocument.value || '',
-      language: 'markdown',
-      theme: theme?.monacoTheme || 'vs',
-      automaticLayout: true,
-      minimap: { enabled: false },
-      fontSize: 16,
-      lineHeight: 28,
-      fontFamily: "'JetBrains Mono', 'Fira Code', 'Source Han Sans SC', 'PingFang SC', monospace",
-      wordWrap: 'on',
-      padding: { top: 16, bottom: 16 },
-      scrollBeyondLastLine: false,
-      mouseWheelZoom: true,
-      smoothScrolling: true,
-      renderWhitespace: 'selection',
-      folding: true,
-      find: {
-        seedSearchStringFromSelection: 'always',
-        autoFindInSelection: 'never',
-        addExtraSpaceOnTop: true,
-      },
-    })
-
-    editor.onDidChangeModelContent(() => {
-      if (applyingExternal || !editor) return
-      const text = editor.getValue()
-      app.setCurrentDocument(text)
-      scheduleSave()
-    })
-
-    editor.onDidChangeCursorPosition((e) => {
-      cursor.value = {
-        line: e.position.lineNumber,
-        column: e.position.column,
-      }
-    })
-
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-      void saveVersion()
-    })
-
-    // 容器刚从隐藏变为可见时，强制重新布局
-    requestAnimationFrame(() => editor?.layout())
-  } catch (error) {
-    console.error('Monaco 初始化失败:', error)
-  }
+function onCursor(value: { line: number; column: number }) {
+  cursor.value = value
 }
 
 function handleGlobalShortcuts(event: KeyboardEvent) {
@@ -288,82 +296,23 @@ function handleGlobalShortcuts(event: KeyboardEvent) {
 
   if (event.code === 'Digit1') {
     event.preventDefault()
-    mode.value = 'edit'
+    mode.value = 'wysiwyg'
   } else if (event.code === 'Digit2') {
     event.preventDefault()
-    mode.value = 'preview'
+    mode.value = 'source'
   } else if (event.code === 'Digit3') {
+    event.preventDefault()
+    mode.value = 'preview'
+  } else if (event.code === 'Digit4') {
     event.preventDefault()
     if (canDiff.value) mode.value = 'diff'
     else message.warning('请先保存一个版本后再对比')
+  } else if (event.code === 'KeyS') {
+    if (mode.value === 'wysiwyg' || mode.value === 'source') {
+      event.preventDefault()
+      void saveVersion()
+    }
   }
-}
-
-function registerMarkdownExtras(m: typeof monaco) {
-  if (markdownExtrasRegistered) return
-  markdownExtrasRegistered = true
-
-  m.languages.setLanguageConfiguration('markdown', {
-    autoClosingPairs: [
-      { open: '[', close: ']' },
-      { open: '(', close: ')' },
-      { open: '{', close: '}' },
-      { open: '"', close: '"' },
-      { open: "'", close: "'" },
-      { open: '`', close: '`' },
-      { open: '*', close: '*' },
-      { open: '_', close: '_' },
-    ],
-    surroundingPairs: [
-      { open: '[', close: ']' },
-      { open: '(', close: ')' },
-      { open: '`', close: '`' },
-      { open: '*', close: '*' },
-      { open: '_', close: '_' },
-    ],
-  })
-
-  m.languages.registerCompletionItemProvider('markdown', {
-    provideCompletionItems(model, position) {
-      const word = model.getWordUntilPosition(position)
-      const range = {
-        startLineNumber: position.lineNumber,
-        endLineNumber: position.lineNumber,
-        startColumn: word.startColumn,
-        endColumn: word.endColumn,
-      }
-
-      const snippets = [
-        { label: 'h1', insertText: '# ${1:标题}', documentation: '一级标题' },
-        { label: 'h2', insertText: '## ${1:标题}', documentation: '二级标题' },
-        { label: 'h3', insertText: '### ${1:标题}', documentation: '三级标题' },
-        { label: 'bold', insertText: '**${1:粗体}**', documentation: '粗体' },
-        { label: 'italic', insertText: '*${1:斜体}*', documentation: '斜体' },
-        { label: 'code', insertText: '`${1:代码}`', documentation: '行内代码' },
-        { label: 'codeblock', insertText: '```${1:language}\n${2:代码}\n```', documentation: '代码块' },
-        { label: 'link', insertText: '[${1:文本}](${2:url})', documentation: '链接' },
-        { label: 'quote', insertText: '> ${1:引用}', documentation: '引用' },
-        { label: 'list', insertText: '- ${1:列表项}', documentation: '无序列表' },
-      ]
-
-      return {
-        suggestions: snippets.map((s) => ({
-          label: s.label,
-          kind: m.languages.CompletionItemKind.Snippet,
-          insertText: s.insertText,
-          insertTextRules: m.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          documentation: s.documentation,
-          range,
-        })),
-      }
-    },
-  })
-}
-
-function applyTheme(id: string) {
-  const theme = getThemeById(id)
-  if (!theme || !editor) return
-  monaco.editor.setTheme(theme.monacoTheme)
 }
 
 function scheduleSave() {
@@ -401,14 +350,6 @@ async function saveVersion() {
   } catch {
     message.error('保存版本失败')
   }
-}
-
-function undo() {
-  editor?.trigger('toolbar', 'undo', null)
-}
-
-function redo() {
-  editor?.trigger('toolbar', 'redo', null)
 }
 </script>
 
