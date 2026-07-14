@@ -119,4 +119,24 @@ test.describe('编辑器 WebView E2E', () => {
     await page.keyboard.press('ControlOrMeta+Digit1')
     await expect(page.getByTestId('editor-wysiwyg-pane')).toBeVisible()
   })
+
+  test('可插入本地图片到写作区', async ({ page }) => {
+    await createBookAndChapter(page)
+    await page.waitForFunction(() => !!(window as any).__branchwriteVditor?.insertImageFiles)
+
+    const inserted = await page.evaluate(async () => {
+      // 1x1 PNG
+      const binary = atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==')
+      const bytes = new Uint8Array(binary.length)
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+      const file = new File([bytes], 'dot.png', { type: 'image/png' })
+      const api = (window as any).__branchwriteVditor
+      const err = await api.insertImageFiles([file])
+      return { err, value: api.getValue() as string }
+    })
+
+    expect(inserted.err).toBeNull()
+    expect(inserted.value).toContain('![dot](data:image/png;base64,')
+    await expect(page.getByTestId('editor-status-bar')).toContainText('字符')
+  })
 })

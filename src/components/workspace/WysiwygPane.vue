@@ -8,6 +8,8 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import Vditor from 'vditor'
 import 'vditor/dist/index.css'
+import { storeImageFile, toMarkdownImage } from '../../services/imageStorage'
+import { useMessage } from 'naive-ui'
 
 const props = defineProps<{
   modelValue: string
@@ -19,10 +21,30 @@ const emit = defineEmits<{
   (e: 'ready'): void
 }>()
 
+const message = useMessage()
 const hostEl = ref<HTMLDivElement | null>(null)
 let vditor: Vditor | null = null
 let applyingExternal = false
 let hostId = `vditor-${Math.random().toString(36).slice(2, 9)}`
+
+async function handleUploadFiles(files: File[]) {
+  if (!vditor) return '编辑器未就绪'
+  const images = files.filter((f) => f.type.startsWith('image/'))
+  if (images.length === 0) return '请选择图片文件'
+
+  try {
+    for (const file of images) {
+      const stored = await storeImageFile(file)
+      vditor.insertValue(`${toMarkdownImage(stored)}\n`)
+    }
+    message.success(images.length > 1 ? `已插入 ${images.length} 张图片` : '图片已插入')
+    return null
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : '图片上传失败'
+    message.error(msg)
+    return msg
+  }
+}
 
 onMounted(async () => {
   await nextTick()
@@ -34,7 +56,7 @@ onMounted(async () => {
     height: '100%',
     mode: 'ir',
     value: props.modelValue || '',
-    placeholder: '开始写作… 支持 Markdown，所见即所得',
+    placeholder: '开始写作… 支持粘贴/拖拽图片',
     cache: { enable: false },
     // Vditor 会拼接 `${cdn}/dist/...`，因此这里只给到 /vditor
     cdn: `${import.meta.env.BASE_URL}vditor`.replace(/\/?$/, ''),
@@ -61,6 +83,7 @@ onMounted(async () => {
       'insert-before',
       'insert-after',
       '|',
+      'upload',
       'link',
       'table',
       '|',
@@ -71,6 +94,24 @@ onMounted(async () => {
       'outline',
       'export',
     ],
+    upload: {
+      accept: 'image/*',
+      multiple: true,
+      max: 5 * 1024 * 1024,
+      filename(name) {
+        return name.replace(/[^\w.\u4e00-\u9fa5-]+/g, '_')
+      },
+      validate(files) {
+        const list = Array.from(files as FileList | File[])
+        if (list.some((f) => !f.type.startsWith('image/'))) {
+          return '仅支持图片'
+        }
+        return true
+      },
+      async handler(files) {
+        return handleUploadFiles(Array.from(files as File[]))
+      },
+    },
     preview: {
       hljs: {
         style: 'github',
@@ -100,6 +141,7 @@ onMounted(async () => {
         __branchwriteVditor?: {
           setValue: (v: string, clearStack?: boolean) => void
           getValue: () => string
+          insertImageFiles?: (files: File[]) => Promise<string | null>
         }
       }).__branchwriteVditor = {
         setValue(v: string, clearStack = true) {
@@ -111,6 +153,7 @@ onMounted(async () => {
         getValue() {
           return vditor?.getValue() ?? ''
         },
+        insertImageFiles: handleUploadFiles,
       }
       emit('ready')
     },
