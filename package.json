@@ -54,11 +54,18 @@
     "typescript-eslint": "^8.35.1",
     "vite": "^7.3.6",
     "vite-plugin-static-copy": "^4.1.1",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "yaml": "2.9.0"
   },
   "optionalDependencies": {
     "@rollup/rollup-linux-x64-gnu": "^4.62.2",
     "@tailwindcss/oxide-linux-x64-gnu": "^4.3.2",
     "lightningcss-linux-x64-gnu": "^1.32.0"
+  },
+  "overrides": {
+    "postcss": "8.5.19",
+    "rollup": "4.62.2",
+    "tar": "7.5.20",
+    "yaml": "2.9.0"
   }
 }
