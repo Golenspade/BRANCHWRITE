@@ -106,7 +106,7 @@
       </div>
 
       <div
-        v-show="mode === 'diff'"
+        v-if="mode === 'diff'"
         class="flex-1 min-h-0 overflow-hidden"
         data-testid="editor-diff-pane"
       >
@@ -144,6 +144,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import { useMessage } from 'naive-ui'
 import { useAppStore } from '../../stores/app'
@@ -166,6 +167,7 @@ const {
 } = storeToRefs(app)
 
 let saveTimer: number | null = null
+let pendingSave: { bookId: string; docId: string; content: string } | null = null
 let applyingExternal = false
 
 const mode = ref<EditorMode>('wysiwyg')
@@ -204,7 +206,8 @@ const compareLabel = computed(() => compareCommit.value?.message || '历史版�
 
 const previewHtml = computed(() => {
   try {
-    return marked.parse(currentDocument.value || '', { async: false }) as string
+    const html = marked.parse(currentDocument.value || '', { async: false }) as string
+    return DOMPurify.sanitize(html)
   } catch {
     return '<p>预览渲染失败</p>'
   }
@@ -233,6 +236,8 @@ watch(documentDraft, (value) => {
 })
 
 watch(currentDocumentConfig, async (doc) => {
+  await flushPendingSave()
+
   if (!doc) {
     wysiwygMounted.value = false
     return
@@ -279,7 +284,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleGlobalShortcuts)
-  if (saveTimer) window.clearTimeout(saveTimer)
+  void flushPendingSave()
 })
 
 function onWysiwygReady() {
@@ -317,20 +322,37 @@ function handleGlobalShortcuts(event: KeyboardEvent) {
 
 function scheduleSave() {
   if (saveTimer) window.clearTimeout(saveTimer)
+  const bookId = currentBook.value?.config.id
+  const docId = currentDocumentConfig.value?.id
+  if (!bookId || !docId) return
+
+  pendingSave = {
+    bookId,
+    docId,
+    content: currentDocument.value,
+  }
   saveState.value = 'idle'
-  saveTimer = window.setTimeout(async () => {
-    const bookId = currentBook.value?.config.id
-    const docId = currentDocumentConfig.value?.id
-    if (!bookId || !docId) return
-    saveState.value = 'saving'
-    try {
-      await app.saveDocumentContent(bookId, docId, currentDocument.value)
-      saveState.value = 'saved'
-    } catch {
-      saveState.value = 'idle'
-      message.error('自动保存失败')
-    }
+  saveTimer = window.setTimeout(() => {
+    void flushPendingSave()
   }, 1200)
+}
+
+async function flushPendingSave() {
+  if (saveTimer) window.clearTimeout(saveTimer)
+  saveTimer = null
+
+  const save = pendingSave
+  pendingSave = null
+  if (!save) return
+
+  saveState.value = 'saving'
+  try {
+    await app.saveDocumentContent(save.bookId, save.docId, save.content)
+    saveState.value = 'saved'
+  } catch {
+    saveState.value = 'idle'
+    message.error('自动保存失败')
+  }
 }
 
 async function saveVersion() {

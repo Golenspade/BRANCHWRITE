@@ -79,6 +79,44 @@ test.describe('编辑器 WebView E2E', () => {
     await expect(page.getByTestId('editor-wysiwyg-pane')).toBeVisible()
   })
 
+  test('预览会移除 Markdown 中的可执行 HTML', async ({ page }) => {
+    await createBookAndChapter(page)
+
+    await typeInWysiwyg(
+      page,
+      '<img src="missing.png" onerror="window.__branchwritePreviewXss = true">',
+    )
+    await page.getByTestId('mode-preview').click()
+
+    await expect(page.getByTestId('markdown-preview').locator('[onerror]')).toHaveCount(0)
+    const executed = await page.evaluate(() => {
+      return (window as unknown as { __branchwritePreviewXss?: boolean }).__branchwritePreviewXss
+    })
+    expect(executed).not.toBe(true)
+  })
+
+  test('未进入对比模式时不挂载 Diff 计算', async ({ page }) => {
+    await createBookAndChapter(page)
+    await expect(page.getByTestId('diff-pane')).toHaveCount(0)
+  })
+
+  test('离开工作区前会保存防抖窗口内的最后编辑', async ({ page }) => {
+    await createBookAndChapter(page)
+    const content = '这段内容写完后立即离开工作区'
+
+    await typeInWysiwyg(page, content)
+    await page.evaluate(() => {
+      window.location.hash = '#/'
+    })
+    await expect(page.getByTestId('create-book-btn')).toBeVisible()
+
+    const persisted = await page.evaluate(() => {
+      const key = Object.keys(localStorage).find((item) => item.startsWith('branchwrite_content_'))
+      return key ? localStorage.getItem(key) : null
+    })
+    expect(persisted).toBe(content)
+  })
+
   test('源码模式 Monaco 仍可用', async ({ page }) => {
     await createBookAndChapter(page)
     await typeInMonaco(page, '## 源码模式内容')
@@ -122,7 +160,12 @@ test.describe('编辑器 WebView E2E', () => {
 
   test('可插入本地图片到写作区', async ({ page }) => {
     await createBookAndChapter(page)
-    await page.waitForFunction(() => !!(window as any).__branchwriteVditor?.insertImageFiles)
+    await page.waitForFunction(() => {
+      const api = (window as unknown as {
+        __branchwriteVditor?: { insertImageFiles?: (files: File[]) => Promise<string | null> }
+      }).__branchwriteVditor
+      return !!api?.insertImageFiles
+    })
 
     const inserted = await page.evaluate(async () => {
       // 1x1 PNG
@@ -130,7 +173,13 @@ test.describe('编辑器 WebView E2E', () => {
       const bytes = new Uint8Array(binary.length)
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
       const file = new File([bytes], 'dot.png', { type: 'image/png' })
-      const api = (window as any).__branchwriteVditor
+      const api = (window as unknown as {
+        __branchwriteVditor?: {
+          getValue: () => string
+          insertImageFiles?: (files: File[]) => Promise<string | null>
+        }
+      }).__branchwriteVditor
+      if (!api?.insertImageFiles) throw new Error('Vditor 图片接口未就绪')
       const err = await api.insertImageFiles([file])
       return { err, value: api.getValue() as string }
     })

@@ -48,8 +48,9 @@ export default defineConfig({
     viteStaticCopy({
       targets: [
         {
-          src: 'node_modules/vditor/dist/*',
+          src: 'node_modules/vditor/dist/**/*',
           dest: 'vditor/dist',
+          rename: { stripBase: 3 },
         },
       ],
     }),
