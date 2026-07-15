@@ -54,7 +54,7 @@ async function typeInMonaco(page: Page, text: string) {
 test.describe('编辑器 WebView E2E', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
-      localStorage.clear()
+      localStorage.removeItem('branchwrite_demo_v2')
     })
   })
 
@@ -111,8 +111,10 @@ test.describe('编辑器 WebView E2E', () => {
     await expect(page.getByTestId('create-book-btn')).toBeVisible()
 
     const persisted = await page.evaluate(() => {
-      const key = Object.keys(localStorage).find((item) => item.startsWith('branchwrite_content_'))
-      return key ? localStorage.getItem(key) : null
+      const raw = localStorage.getItem('branchwrite_demo_v2')
+      if (!raw) return null
+      const state = JSON.parse(raw) as { documents: Record<string, { content: string }> }
+      return Object.values(state.documents)[0]?.content ?? null
     })
     expect(persisted).toBe(content)
   })
@@ -144,6 +146,32 @@ test.describe('编辑器 WebView E2E', () => {
     await expect(page.getByTestId('diff-compare-label')).toHaveText('初始版本')
     await expect(page.getByTestId('diff-added-count')).toBeVisible()
     await expect(page.getByTestId('diff-removed-count')).toBeVisible()
+  })
+
+  test('Web Demo 可创建、查看、对比并安全恢复完整版本', async ({ page }) => {
+    await createBookAndChapter(page)
+    await expect(page.getByTestId('persistence-demo-banner')).toBeVisible()
+    await typeInWysiwyg(page, '可恢复的第一版')
+
+    page.once('dialog', async (dialog) => dialog.accept('恢复目标'))
+    await page.getByTestId('save-version').click()
+    await expect(page.getByText('恢复目标', { exact: true })).toBeVisible()
+
+    await page.getByTestId('version-view-btn').first().click()
+    await expect(page.getByTestId('version-detail')).toContainText('可恢复的第一版')
+    await page.getByTestId('version-detail-close').click()
+
+    await typeInWysiwyg(page, '恢复前的第二版内容')
+    await page.getByTestId('version-diff-btn').first().click()
+    await expect(page.getByTestId('editor-diff-pane')).toBeVisible()
+    await expect(page.getByTestId('diff-compare-label')).toHaveText('恢复目标')
+
+    page.once('dialog', async (dialog) => dialog.accept())
+    await page.getByTestId('version-restore-btn').first().click()
+    await expect.poll(async () => page.evaluate(() => {
+      const api = (window as unknown as { __branchwriteVditor?: { getValue: () => string } }).__branchwriteVditor
+      return api?.getValue() ?? ''
+    })).toContain('可恢复的第一版')
   })
 
   test('快捷键可切换到预览模式', async ({ page }) => {

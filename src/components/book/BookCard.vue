@@ -56,18 +56,18 @@
 
     <template #footer>
       <n-space justify="space-between" class="text-xs text-gray-400">
-        <span>创建于 {{ formatDate(book.created_at) }}</span>
-        <span>修改于 {{ formatDate(book.last_modified) }}</span>
+        <span>创建于 {{ formatDate(book.createdAtMs) }}</span>
+        <span>修改于 {{ formatDate(book.updatedAtMs) }}</span>
       </n-space>
     </template>
   </n-card>
 </template>
 
 <script setup lang="ts">
-import type { BookConfig } from '../../types/index'
+import type { Book } from '../../persistence/contracts'
 
 interface Props {
-  book: BookConfig
+  book: Book
 }
 
 interface Emits {
@@ -75,11 +75,11 @@ interface Emits {
   (e: 'delete'): void
 }
 
-const props = defineProps<Props>()
+defineProps<Props>()
 const emit = defineEmits<Emits>()
 
-const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString('zh-CN')
+const formatDate = (timestamp: number) => {
+  return new Date(timestamp).toLocaleDateString('zh-CN')
 }
 
 const handleSelect = () => {

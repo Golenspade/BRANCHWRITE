@@ -62,15 +62,13 @@ const isSubmitting = ref(false)
 
 const formData = ref({
   title: '',
-  type: '章节'
+  type: 'chapter'
 })
 
 const typeOptions = [
-  { label: '📄 章节', value: '章节' },
-  { label: '📝 笔记', value: '笔记' },
-  { label: '📋 大纲', value: '大纲' },
-  { label: '📌 设定', value: '设定' },
-  { label: '📖 其他', value: '其他' }
+  { label: '📄 章节', value: 'chapter' },
+  { label: '📑 小节', value: 'section' },
+  { label: '📝 笔记', value: 'note' }
 ]
 
 const rules: FormRules = {
@@ -122,7 +120,7 @@ const handleClose = () => {
 const resetForm = () => {
   formData.value = {
     title: '',
-    type: '章节'
+    type: 'chapter'
   }
   formRef.value?.restoreValidation()
 }

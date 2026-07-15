@@ -1,50 +1,58 @@
 <template>
   <n-card title="版本历史" class="h-full flex flex-col" :bordered="false">
     <template #header-extra>
-      <n-space :size="8">
-        <n-button size="small" type="primary" @click="createCommit">
-          <template #icon>
-            <n-icon>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
-              </svg>
-            </n-icon>
-          </template>
-          提交
-        </n-button>
-      </n-space>
+      <n-button size="small" type="primary" data-testid="version-panel-create" @click="createVersion">
+        提交
+      </n-button>
     </template>
 
+    <div
+      v-if="error"
+      class="m-2 rounded bg-red-50 px-3 py-2 text-xs text-red-700"
+      data-testid="persistence-operation-error"
+    >
+      {{ error }}
+    </div>
+    <div
+      v-if="info"
+      class="m-2 rounded bg-blue-50 px-3 py-2 text-xs text-blue-700"
+      data-testid="persistence-operation-info"
+    >
+      {{ info }}
+    </div>
+
     <n-scrollbar style="max-height: 100%">
-      <n-empty v-if="commits.length === 0" description="还没有版本记录">
-        <template #icon>
-          <div class="text-4xl">📝</div>
-        </template>
+      <n-empty v-if="versions.length === 0" description="还没有版本记录">
+        <template #icon><div class="text-4xl">📝</div></template>
       </n-empty>
 
       <n-list v-else>
-        <n-list-item v-for="(commit, index) in commits" :key="commit.id">
+        <n-list-item v-for="(version, index) in versions" :key="version.id">
           <n-thing>
             <template #avatar>
               <n-tag :type="index === 0 ? 'primary' : 'default'" size="small">
-                {{ index === 0 ? '当前' : `v${commits.length - index}` }}
+                {{ index === 0 ? '最新版本' : `v${version.sequence}` }}
               </n-tag>
             </template>
-            <template #header>
-              {{ commit.message || '无标题提交' }}
-            </template>
+            <template #header>{{ version.message }}</template>
             <template #description>
-              <n-space :size="8">
-                <span class="text-xs text-gray-500">{{ formatTimeAgo(commit.timestamp) }}</span>
-                <n-tag v-if="commit.isAutoCommit" size="tiny" type="success">自动</n-tag>
-              </n-space>
+              <span class="text-xs text-gray-500">{{ formatTimeAgo(version.createdAtMs) }}</span>
             </template>
             <template #action>
               <n-space :size="4">
-                <n-button size="tiny" @click="handleViewVersion(commit)">查看</n-button>
-                <n-button size="tiny" data-testid="compare-version-btn" @click="handleCompareVersion(commit)">对比</n-button>
-                <n-button v-if="index !== 0" size="tiny" type="warning" @click="handleRevertToVersion(commit)">
-                  回滚
+                <n-button size="tiny" data-testid="version-view-btn" @click="viewVersion(version.id)">
+                  查看
+                </n-button>
+                <n-button size="tiny" data-testid="version-diff-btn" @click="compareVersion(version.id)">
+                  对比
+                </n-button>
+                <n-button
+                  size="tiny"
+                  type="warning"
+                  data-testid="version-restore-btn"
+                  @click="restore(version.id, version.message)"
+                >
+                  恢复
                 </n-button>
               </n-space>
             </template>
@@ -53,25 +61,19 @@
       </n-list>
     </n-scrollbar>
 
-    <!-- 版本详情弹窗 -->
-    <n-modal
-      v-model:show="showVersionDetail"
-      preset="card"
-      title="版本详情"
-      :style="{ width: '80vw', height: '80vh' }"
-    >
+    <n-modal v-model:show="showVersionDetail" preset="card" title="版本详情" :style="{ width: '80vw', height: '80vh' }">
       <n-scrollbar style="max-height: calc(80vh - 120px)">
-        <pre class="whitespace-pre-wrap text-sm">{{ selectedVersionContent }}</pre>
+        <pre class="whitespace-pre-wrap text-sm" data-testid="version-detail">{{ selectedVersion?.content }}</pre>
       </n-scrollbar>
       <template #footer>
         <n-space justify="end">
-          <n-button @click="showVersionDetail = false">关闭</n-button>
+          <n-button data-testid="version-detail-close" @click="showVersionDetail = false">关闭</n-button>
           <n-button
-            v-if="selectedCommit && commits[0]?.id !== selectedCommit.id"
+            v-if="selectedVersion"
             type="warning"
-            @click="confirmRevertToVersion(selectedCommit)"
+            @click="restore(selectedVersion.id, selectedVersion.message)"
           >
-            回滚到此版本
+            恢复到此版本
           </n-button>
         </n-space>
       </template>
@@ -80,67 +82,65 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useMessage } from 'naive-ui'
 import { useAppStore } from '../../stores/app'
-import type { CommitInfo } from '../../types/index'
-
-interface Emits {
-  (e: 'revert', commitId: string, content: string): void
-}
-
-const emit = defineEmits<Emits>()
 
 const app = useAppStore()
-const { commits } = storeToRefs(app)
-
+const message = useMessage()
+const { versions, versionDetails, error, info } = storeToRefs(app)
 const showVersionDetail = ref(false)
-const selectedCommit = ref<CommitInfo | null>(null)
-const selectedVersionContent = ref('')
+const selectedVersionId = ref<string | null>(null)
+const selectedVersion = computed(() => selectedVersionId.value
+  ? versionDetails.value[selectedVersionId.value] ?? null
+  : null)
 
-const formatTimeAgo = (timestamp: number) => {
-  const now = Date.now()
-  const diff = now - timestamp
-  const minutes = Math.floor(diff / (1000 * 60))
-  const hours = Math.floor(diff / (1000 * 60 * 60))
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-
+function formatTimeAgo(timestamp: number) {
+  const minutes = Math.floor((Date.now() - timestamp) / 60_000)
   if (minutes < 1) return '刚才'
   if (minutes < 60) return `${minutes}分钟前`
-  if (hours < 24) return `${hours}小时前`
-  return `${days}天前`
+  const hours = Math.floor(minutes / 60)
+  return hours < 24 ? `${hours}小时前` : `${Math.floor(hours / 24)}天前`
 }
 
-function createCommit() {
-  const msg = prompt('请输入版本描述：')
-  if (msg && msg.trim()) {
-    app.createCommit(msg.trim())
+async function createVersion() {
+  const value = window.prompt('请输入版本描述：')
+  if (!value?.trim()) return
+  try {
+    await app.createVersion(value.trim())
+    message.success('版本已保存')
+  } catch {
+    message.error('保存版本失败')
   }
 }
 
-const handleViewVersion = (commit: CommitInfo) => {
-  selectedCommit.value = commit
-  const diff = app.getCommitDiff(commit.id)
-  selectedVersionContent.value = diff?.content || '内容不可用'
-  showVersionDetail.value = true
-}
-
-const handleCompareVersion = (commit: CommitInfo) => {
-  app.setSelectedCommits([commit.id])
-  app.setCurrentMode('diff')
-}
-
-const handleRevertToVersion = (commit: CommitInfo) => {
-  if (window.confirm(`确定要回滚到版本"${commit.message}"吗？`)) {
-    const diff = app.getCommitDiff(commit.id)
-    const content = diff?.content || ''
-    emit('revert', commit.id, content)
+async function viewVersion(versionId: string) {
+  try {
+    const detail = await app.loadVersionDetail(versionId)
+    if (!detail) return
+    selectedVersionId.value = versionId
+    showVersionDetail.value = true
+  } catch {
+    message.error('加载版本详情失败')
   }
 }
 
-const confirmRevertToVersion = (commit: CommitInfo) => {
-  showVersionDetail.value = false
-  handleRevertToVersion(commit)
+async function compareVersion(versionId: string) {
+  try { await app.selectVersionForDiff(versionId) }
+  catch { message.error('加载对比版本失败') }
+}
+
+async function restore(versionId: string, versionMessage: string) {
+  if (!window.confirm(`确定要恢复到版本“${versionMessage}”吗？`)) return
+  try {
+    const result = await app.restoreVersion(versionId)
+    showVersionDetail.value = false
+    if (result.alreadyCurrent) message.info('当前内容已经是此版本')
+    else message.success('版本已恢复，并已保留恢复前安全快照')
+  } catch {
+    message.error('恢复版本失败')
+  }
 }
 </script>
 

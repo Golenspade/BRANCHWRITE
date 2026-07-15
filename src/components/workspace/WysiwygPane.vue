@@ -25,7 +25,7 @@ const message = useMessage()
 const hostEl = ref<HTMLDivElement | null>(null)
 let vditor: Vditor | null = null
 let applyingExternal = false
-let hostId = `vditor-${Math.random().toString(36).slice(2, 9)}`
+const hostId = `vditor-${Math.random().toString(36).slice(2, 9)}`
 
 async function handleUploadFiles(files: File[]) {
   if (!vditor) return '编辑器未就绪'

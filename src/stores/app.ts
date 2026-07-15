@@ -1,382 +1,393 @@
+import { computed, ref, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import type { AppState, CommitInfo, ProjectConfig, BookConfig, BookData, DocumentConfig } from '../types/index'
-import { DocumentManager } from '../models/DocumentManager'
-import { FileSystemService } from '../services/fileSystemService'
+import type { CommitInfo } from '../types/index'
+import type {
+  Book, DocumentDetail, DocumentSummary, RestoreVersionResult,
+  VersionDetail, VersionSummary,
+} from '../persistence/contracts'
+import type { PersistenceGateway } from '../persistence/gateway'
+
+type EditorMode = 'wysiwyg' | 'source' | 'preview' | 'diff' | 'edit'
+type SaveState = 'idle' | 'pending' | 'saving' | 'saved' | 'error'
+type SaveRequest = { documentId: string; content: string }
+
+function toDocumentSummary(detail: DocumentDetail): DocumentSummary {
+  const summary = { ...detail } as Partial<DocumentDetail>
+  delete summary.content
+  delete summary.contentHash
+  return summary as DocumentSummary
+}
+
+function errorMessage(error: unknown) {
+  if (error && typeof error === 'object' && 'message' in error) return String(error.message)
+  return error instanceof Error ? error.message : String(error)
+}
 
 export const useAppStore = defineStore('app', () => {
-  // 状态
+  let gateway: PersistenceGateway | null = null
+  let requestGeneration = 0
+  let saveTimer: ReturnType<typeof setTimeout> | null = null
+  let pendingSave: SaveRequest | null = null
+  let failedSave: SaveRequest | null = null
+  let saveFailure: unknown = null
+  let saveLoop: Promise<void> | null = null
+
+  const books = shallowRef<Book[]>([])
+  const currentBook = shallowRef<Book | null>(null)
+  const documents = ref<DocumentSummary[]>([])
+  const currentDocumentId = ref<string | null>(null)
+  const currentDocumentDetail = ref<DocumentDetail | null>(null)
   const currentDocument = ref('')
-  const isHistoryPanelOpen = ref(false)
-  const isDiffViewOpen = ref(false)
+  const versions = ref<VersionSummary[]>([])
+  const versionDetails = ref<Record<string, VersionDetail>>({})
   const selectedCommits = ref<string[]>([])
-  const currentMode = ref<'wysiwyg' | 'source' | 'preview' | 'diff' | 'edit'>('wysiwyg')
+  const currentMode = ref<EditorMode>('wysiwyg')
   const isLoading = ref(false)
   const error = ref<string | null>(null)
-  const commits = ref<CommitInfo[]>([])
-  const commitData = ref<Record<string, string>>({})
+  const info = ref<string | null>(null)
+  const saveState = ref<SaveState>('idle')
+  const showBookSelector = ref(true)
+  const isHistoryPanelOpen = ref(false)
+  const isDiffViewOpen = ref(false)
 
-  // 项目相关
-  const projectConfig = ref<ProjectConfig | null>(null)
-  const projectPath = ref<string | null>(null)
+  const currentDocumentConfig = computed(() => currentDocumentDetail.value)
+  const commits = computed<CommitInfo[]>(() => versions.value.map((version) => ({
+    id: version.id,
+    timestamp: version.createdAtMs,
+    message: version.message,
+    isAutoCommit: false,
+  })))
+  const commitData = computed(() => Object.fromEntries(
+    Object.entries(versionDetails.value).map(([id, detail]) => [id, detail.content]),
+  ))
 
-  // 书籍相关
-  const currentBook = ref<BookData | null>(null)
-  const books = ref<BookConfig[]>([])
-  const showBookSelector = ref(true) // 默认显示书本选择器
-
-  // 文档管理
-  const currentDocumentConfig = ref<DocumentConfig | null>(null)
-  const documents = ref<DocumentConfig[]>([])
-
-  // DocumentManager
-  const documentManager = ref<DocumentManager | null>(null)
-
-  // 计算属性（如果需要的话）
-  
-  // Actions
-  
-  // 文档初始化
-  const initializeDocument = (initialText: string = '', title: string = 'Untitled') => {
-    currentDocument.value = initialText
-    commits.value = []
+  function requireGateway() {
+    if (!gateway) throw new Error('Persistence is not configured')
+    return gateway
   }
 
-  // 文档操作
-  const setCurrentDocument = (content: string) => {
-    currentDocument.value = content
-  }
-
-  const setCurrentMode = (mode: 'wysiwyg' | 'source' | 'preview' | 'diff' | 'edit') => {
+  function configurePersistence(value: PersistenceGateway) { gateway = value }
+  function setCurrentMode(mode: EditorMode) {
     currentMode.value = mode === 'edit' ? 'wysiwyg' : mode
   }
+  function setSelectedCommits(ids: string[]) { selectedCommits.value = ids }
+  function setCurrentDocument(content: string) { currentDocument.value = content }
+  function initializeDocument(content = '') { currentDocument.value = content }
 
-  const setSelectedCommits = (ids: string[]) => {
-    selectedCommits.value = ids
+  function updateSummary(detail: DocumentDetail) {
+    const summary = toDocumentSummary(detail)
+    const index = documents.value.findIndex((item) => item.id === detail.id)
+    if (index >= 0) documents.value[index] = summary
+    else documents.value.push(summary)
   }
 
-  // 项目管理（简化版）
-  const createProject = async (name: string, path: string) => {
+  function applyLoadedDocument(detail: DocumentDetail, loadedVersions: VersionSummary[]) {
+    currentDocumentDetail.value = detail
+    currentDocument.value = detail.content
+    versions.value = loadedVersions
+    versionDetails.value = {}
+    selectedCommits.value = []
+    updateSummary(detail)
+  }
+
+  async function loadBooks() {
+    isLoading.value = true
+    error.value = null
+    try { books.value = await requireGateway().listBooks() }
+    catch (failure) { error.value = errorMessage(failure); throw failure }
+    finally { isLoading.value = false }
+  }
+
+  async function selectBook(bookId: string) {
+    if (currentDocumentId.value) await flushDocumentSave()
+    isLoading.value = true
+    error.value = null
     try {
-      isLoading.value = true
-      error.value = null
-      console.log('Create project:', name, path)
-      isLoading.value = false
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to create project'
-      isLoading.value = false
-    }
-  }
-
-  const loadProject = async (projectId: string) => {
-    try {
-      isLoading.value = true
-      error.value = null
-      console.log('Load project:', projectId)
-      isLoading.value = false
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to load project'
-      isLoading.value = false
-    }
-  }
-
-  const saveProject = async () => {
-    try {
-      console.log('Save project')
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to save project'
-    }
-  }
-
-  // 版本管理（简化版）
-  const createCommit = (message: string) => {
-    const id = Date.now().toString()
-    const newCommit: CommitInfo = {
-      id,
-      timestamp: Date.now(),
-      message,
-      isAutoCommit: false,
-    }
-    commits.value = [newCommit, ...commits.value]
-    // 保存当前文档快照
-    commitData.value[id] = currentDocument.value
-  }
-
-  const checkoutCommit = (commitId: string) => {
-    console.log('Checkout commit:', commitId)
-  }
-
-  const getCommitDiff = (commitId: string) => {
-    const snap = commitData.value[commitId]
-    if (snap == null) return null
-    return { id: commitId, content: snap }
-  }
-
-  // 书本管理
-  const loadBooks = async () => {
-    console.log('🏪 Store: 开始加载书籍列表')
-    try {
-      isLoading.value = true
-      error.value = null
-
-      const booksList = await listBooks()
-      console.log('🏪 Store: 获取到书籍列表', booksList.length, '本书')
-      books.value = booksList
-      console.log('🏪 Store: books.value 已更新', books.value.length)
-      isLoading.value = false
-    } catch (err) {
-      console.error('🏪 Store: 加载书籍列表失败', err)
-      error.value = err instanceof Error ? err.message : 'Failed to load books'
-      isLoading.value = false
-    }
-  }
-
-  const selectBook = async (bookId: string) => {
-    try {
-      await loadBook(bookId)
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to select book'
-    }
-  }
-
-  const loadBook = async (bookId: string) => {
-    console.log('📖 Store: 开始加载书籍', bookId)
-    try {
-      isLoading.value = true
-      error.value = null
-
-      const bookData = await FileSystemService.loadBook(bookId)
-      console.log('📖 Store: 书籍数据加载成功', bookData)
-
-      currentBook.value = bookData
-      documents.value = bookData.documents
-      currentDocumentConfig.value = bookData.documents[0] || null
+      const [book, summaries] = await Promise.all([
+        requireGateway().getBook(bookId), requireGateway().listDocuments(bookId),
+      ])
+      currentBook.value = book
+      documents.value = summaries
+      clearDocumentState(null)
       showBookSelector.value = false
-      console.log('📖 Store: 文档列表已设置', documents.value.length, '个文档')
-      isLoading.value = false
-    } catch (err) {
-      console.error('📖 Store: 加载书籍失败', err)
-      error.value = err instanceof Error ? err.message : 'Failed to load book'
-      isLoading.value = false
-    }
+    } catch (failure) { error.value = errorMessage(failure); throw failure }
+    finally { isLoading.value = false }
   }
 
-  const createBook = async (name: string, description: string, author: string, genre: string) => {
+  async function createBook(name: string, description: string, author: string, genre: string) {
     try {
-      const bookData = await FileSystemService.createBook(
-        name,
-        description,
-        author,
-        genre
-      )
-
-      // 更新本地书籍列表
-      books.value = [bookData.config, ...books.value]
-
-      return bookData.config.id
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to create book'
-      throw err
-    }
+      const created = await requireGateway().createBook({
+        name, description, author, genre, coverImage: null, tags: [], settings: {},
+      })
+      books.value = [created, ...books.value]
+      return created.id
+    } catch (failure) { error.value = errorMessage(failure); throw failure }
   }
 
-  const updateBook = async (bookId: string, config: Partial<BookConfig>) => {
+  async function deleteBook(bookId: string) {
     try {
-      console.log('Update book:', bookId, config)
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to update book'
-    }
-  }
-
-  const deleteBook = async (bookId: string) => {
-    try {
-      await FileSystemService.deleteBook(bookId)
-
-      // 更新本地书籍列表
-      books.value = books.value.filter(book => book.id !== bookId)
-
-      // 如果删除的是当前书籍，清除当前书籍状态
-      if (currentBook.value?.config.id === bookId) {
+      await requireGateway().deleteBook(bookId)
+      books.value = books.value.filter((book) => book.id !== bookId)
+      if (currentBook.value?.id === bookId) {
         currentBook.value = null
         documents.value = []
-        currentDocumentConfig.value = null
-        currentDocument.value = ''
+        clearDocumentState(null)
         showBookSelector.value = true
       }
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to delete book'
-    }
+    } catch (failure) { error.value = errorMessage(failure); throw failure }
   }
 
-  const listBooks = async (): Promise<BookConfig[]> => {
-    console.log('🏪 Store: 调用 FileSystemService.listBooks()')
-    try {
-      const result = await FileSystemService.listBooks()
-      console.log('🏪 Store: FileSystemService 返回', result.length, '本书')
-      return result
-    } catch (err) {
-      console.error('🏪 Store: listBooks 失败', err)
-      error.value = err instanceof Error ? err.message : 'Failed to list books'
-      return []
-    }
+  async function loadDocuments(bookId: string) {
+    try { documents.value = await requireGateway().listDocuments(bookId) }
+    catch (failure) { error.value = errorMessage(failure); throw failure }
   }
 
-  // 文档管理
-  const createDocument = async (bookId: string, title: string, docType: string) => {
-    console.log('🏪 Store: 开始创建文档', { bookId, title, docType })
+  async function createDocument(bookId: string, title: string, documentType: string) {
     try {
-      const newDoc = await FileSystemService.createDocument(bookId, title, docType)
-      console.log('🏪 Store: 文档创建成功', newDoc)
-
-      // 更新文档列表
-      documents.value = [...documents.value, newDoc]
-      console.log('🏪 Store: 文档列表已更新', documents.value.length)
-
-      return newDoc.id
-    } catch (err) {
-      console.error('🏪 Store: 创建文档失败', err)
-      error.value = err instanceof Error ? err.message : 'Failed to create document'
-      throw err
-    }
+      const created = await requireGateway().createDocument({
+        bookId, title, sortOrder: documents.value.length,
+        documentType, status: 'draft', content: '',
+      })
+      updateSummary(created)
+      return created.id
+    } catch (failure) { error.value = errorMessage(failure); throw failure }
   }
 
-  const updateDocument = async (documentId: string, updates: Partial<DocumentConfig>) => {
+  async function deleteDocument(bookOrDocumentId: string, maybeDocumentId?: string) {
+    const documentId = maybeDocumentId ?? bookOrDocumentId
     try {
-      console.log('Update document:', documentId, updates)
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to update document'
-    }
+      await flushDocumentSave()
+      await requireGateway().deleteDocument(documentId)
+      documents.value = documents.value.filter((document) => document.id !== documentId)
+      if (currentDocumentId.value === documentId) clearDocumentState(null)
+    } catch (failure) { error.value = errorMessage(failure); throw failure }
   }
 
-  const deleteDocument = async (bookId: string, documentId: string) => {
+  function clearDocumentState(target: string | null) {
+    if (saveTimer) clearTimeout(saveTimer)
+    saveTimer = null
+    pendingSave = null
+    failedSave = null
+    saveFailure = null
+    saveState.value = 'idle'
+    currentDocumentId.value = target
+    currentDocumentDetail.value = null
+    currentDocument.value = ''
+    versions.value = []
+    versionDetails.value = {}
+    selectedCommits.value = []
+  }
+
+  async function switchDocument(documentId: string) {
+    await flushDocumentSave()
+    const generation = ++requestGeneration
+    clearDocumentState(documentId)
     try {
-      await FileSystemService.deleteDocument(bookId, documentId)
-
-      // 从文档列表中移除
-      documents.value = documents.value.filter(doc => doc.id !== documentId)
-
-      // 如果删除的是当前文档，清空当前文档
-      if (currentDocumentConfig.value?.id === documentId) {
-        currentDocumentConfig.value = null
-        currentDocument.value = ''
+      const [detail, summaries] = await Promise.all([
+        requireGateway().getDocument(documentId), requireGateway().listVersions(documentId),
+      ])
+      if (generation === requestGeneration && currentDocumentId.value === documentId) {
+        applyLoadedDocument(detail, summaries)
       }
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to delete document'
+    } catch (failure) {
+      if (generation === requestGeneration && currentDocumentId.value === documentId) {
+        error.value = errorMessage(failure)
+      }
+      throw failure
     }
   }
 
-  const switchDocument = async (documentId: string) => {
-    try {
-      console.log('Switch document:', documentId)
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to switch document'
+  async function reloadCurrentDocument(documentId: string, generation: number) {
+    const [detail, summaries] = await Promise.all([
+      requireGateway().getDocument(documentId), requireGateway().listVersions(documentId),
+    ])
+    if (generation === requestGeneration && currentDocumentId.value === documentId) {
+      applyLoadedDocument(detail, summaries)
     }
   }
 
-  // 文档内容管理
-  const loadDocuments = async (bookId: string) => {
+  function queueDocumentSave(content: string) {
+    const detail = currentDocumentDetail.value
+    if (!detail) return
+    currentDocument.value = content
+    const request = { documentId: detail.id, content }
+    if (failedSave?.documentId === detail.id) {
+      failedSave = request
+      saveState.value = 'error'
+      return
+    }
+    pendingSave = request
+    saveState.value = 'pending'
+    if (saveTimer) clearTimeout(saveTimer)
+    saveTimer = setTimeout(() => { void flushDocumentSave().catch(() => undefined) }, 1200)
+  }
+
+  async function processSaveQueue() {
+    while (pendingSave) {
+      const request = pendingSave
+      pendingSave = null
+      const detail = currentDocumentDetail.value
+      if (!detail || detail.id !== request.documentId) continue
+      saveState.value = 'saving'
+      let saved: DocumentDetail
+      try {
+        saved = await requireGateway().saveDocument({
+          documentId: request.documentId,
+          content: request.content,
+          expectedRevision: detail.revision,
+        })
+      } catch (failure) {
+        failedSave = pendingSave?.documentId === request.documentId ? pendingSave : request
+        pendingSave = null
+        saveFailure = failure
+        if (saveTimer) clearTimeout(saveTimer)
+        saveTimer = null
+        saveState.value = 'error'
+        error.value = errorMessage(failure)
+        throw failure
+      }
+      if (currentDocumentId.value === saved.id) {
+        currentDocumentDetail.value = saved
+        updateSummary(saved)
+      }
+      saveState.value = pendingSave ? 'pending' : 'saved'
+    }
+  }
+
+  function startSaveLoop() {
+    if (!saveLoop) {
+      const running = processSaveQueue()
+        .finally(() => { if (saveLoop === running) saveLoop = null })
+      saveLoop = running
+    }
+    return saveLoop
+  }
+
+  async function flushDocumentSave() {
+    if (saveTimer) clearTimeout(saveTimer)
+    saveTimer = null
+    if (failedSave) throw saveFailure
+    while (pendingSave || saveLoop) await (saveLoop ?? startSaveLoop())
+    if (failedSave) throw saveFailure
+  }
+
+  async function retryDocumentSave() {
+    if (!failedSave) return flushDocumentSave()
+    pendingSave = failedSave
+    failedSave = null
+    saveFailure = null
+    error.value = null
+    saveState.value = 'pending'
+    await flushDocumentSave()
+  }
+
+  async function reloadDocumentDiscardingDraft() {
+    const documentId = currentDocumentId.value
+    if (!documentId) return
+    const generation = ++requestGeneration
     try {
-      isLoading.value = true
+      await reloadCurrentDocument(documentId, generation)
+      if (saveTimer) clearTimeout(saveTimer)
+      saveTimer = null
+      pendingSave = null
+      failedSave = null
+      saveFailure = null
       error.value = null
-
-      const docs = await FileSystemService.listDocuments(bookId)
-
-      documents.value = docs
-      isLoading.value = false
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to load documents'
-      isLoading.value = false
+      saveState.value = 'idle'
+    } catch (failure) {
+      error.value = errorMessage(failure)
+      saveState.value = 'error'
+      throw failure
     }
   }
 
-  const loadDocumentContent = async (bookId: string, documentId: string) => {
+  async function loadVersionDetail(versionId: string) {
+    const cached = versionDetails.value[versionId]
+    if (cached) return cached
+    const documentId = currentDocumentId.value
+    const generation = requestGeneration
+    if (!documentId) throw new Error('No document selected')
     try {
-      return await FileSystemService.loadDocument(bookId, documentId)
-    } catch (err) {
-      console.error('Failed to load document content:', err)
-      throw err
+      const detail = await requireGateway().getVersion(documentId, versionId)
+      if (generation !== requestGeneration || currentDocumentId.value !== documentId) return null
+      versionDetails.value = { ...versionDetails.value, [versionId]: detail }
+      return detail
+    } catch (failure) {
+      if (generation !== requestGeneration || currentDocumentId.value !== documentId) return null
+      error.value = errorMessage(failure)
+      throw failure
     }
   }
 
-  const saveDocumentContent = async (bookId: string, documentId: string, content: string) => {
+  async function selectVersionForDiff(versionId: string) {
+    const detail = await loadVersionDetail(versionId)
+    if (!detail) return false
+    selectedCommits.value = [versionId]
+    currentMode.value = 'diff'
+    return true
+  }
+
+  function getCommitDiff(versionId: string) {
+    const detail = versionDetails.value[versionId]
+    return detail ? { id: versionId, content: detail.content } : null
+  }
+
+  async function createVersion(message: string) {
+    await flushDocumentSave()
+    const detail = currentDocumentDetail.value
+    if (!detail) throw new Error('No document selected')
+    const generation = requestGeneration
+    error.value = null
     try {
-      await FileSystemService.saveDocument(bookId, documentId, content)
-
-      // 更新文档管理器
-      if (documentManager.value) {
-        documentManager.value.updateDocument(content)
-      }
-    } catch (err) {
-      console.error('Failed to save document content:', err)
-      throw err
-    }
+      const created = await requireGateway().createVersion({
+        operationId: crypto.randomUUID(), documentId: detail.id,
+        content: currentDocument.value, message, expectedRevision: detail.revision,
+      })
+      await reloadCurrentDocument(detail.id, generation)
+      return created
+    } catch (failure) { error.value = errorMessage(failure); throw failure }
   }
 
-  const selectDocument = (document: DocumentConfig) => {
-    currentDocumentConfig.value = document
+  async function restoreVersion(versionId: string): Promise<RestoreVersionResult> {
+    await flushDocumentSave()
+    const detail = currentDocumentDetail.value
+    if (!detail) throw new Error('No document selected')
+    const generation = requestGeneration
+    error.value = null
+    info.value = null
+    try {
+      const result = await requireGateway().restoreVersion({
+        operationId: crypto.randomUUID(), documentId: detail.id,
+        targetVersionId: versionId, expectedRevision: detail.revision,
+      })
+      if (result.alreadyCurrent) info.value = '已经是此版本'
+      else await reloadCurrentDocument(detail.id, generation)
+      return result
+    } catch (failure) { error.value = errorMessage(failure); throw failure }
   }
 
-  // DocumentManager 相关
-  const initializeDocumentManager = (content: string, title: string) => {
-    documentManager.value = new DocumentManager(content, title)
+  async function loadDocumentContent(_bookId: string, documentId: string) {
+    return (await requireGateway().getDocument(documentId)).content
   }
-
-  // 设置
-  const updateSettings = (settings: Partial<any>) => {
-    console.log('Update settings:', settings)
+  async function saveDocumentContent(_bookId: string, documentId: string, content: string) {
+    if (currentDocumentId.value !== documentId) await switchDocument(documentId)
+    queueDocumentSave(content)
+    await flushDocumentSave()
   }
-
-  const setShowBookSelector = (show: boolean) => {
-    showBookSelector.value = show
-  }
+  function selectDocument(document: DocumentSummary) { return switchDocument(document.id) }
+  function setShowBookSelector(show: boolean) { showBookSelector.value = show }
 
   return {
-    // 状态
-    currentDocument,
-    isHistoryPanelOpen,
-    isDiffViewOpen,
-    selectedCommits,
-    currentMode,
-    isLoading,
-    error,
-    commits,
-    projectConfig,
-    projectPath,
-    currentBook,
-    books,
-    showBookSelector,
-    currentDocumentConfig,
-    documents,
-    documentManager,
-
-    // Actions
-    initializeDocument,
-    setCurrentDocument,
-    setCurrentMode,
-    setSelectedCommits,
-    createProject,
-    loadProject,
-    saveProject,
-    createCommit,
-    checkoutCommit,
-    getCommitDiff,
-    loadBooks,
-    selectBook,
-    loadBook,
-    createBook,
-    updateBook,
-    deleteBook,
-    listBooks,
-    createDocument,
-    updateDocument,
-    deleteDocument,
-    switchDocument,
-    loadDocuments,
-    loadDocumentContent,
-    saveDocumentContent,
-    selectDocument,
-    initializeDocumentManager,
-    updateSettings,
-    setShowBookSelector
+    books, currentBook, documents, currentDocumentId, currentDocumentDetail,
+    currentDocumentConfig, currentDocument, versions, versionDetails, commits, commitData,
+    selectedCommits, currentMode, isLoading, error, info, saveState, showBookSelector,
+    isHistoryPanelOpen, isDiffViewOpen,
+    configurePersistence, initializeDocument, setCurrentDocument, setCurrentMode,
+    setSelectedCommits, loadBooks, selectBook, loadBook: selectBook, createBook,
+    deleteBook, loadDocuments, createDocument, deleteDocument, switchDocument,
+    selectDocument, queueDocumentSave, flushDocumentSave, loadVersionDetail,
+    retryDocumentSave, reloadDocumentDiscardingDraft,
+    selectVersionForDiff, getCommitDiff, createVersion, restoreVersion,
+    loadDocumentContent, saveDocumentContent, setShowBookSelector,
   }
 })

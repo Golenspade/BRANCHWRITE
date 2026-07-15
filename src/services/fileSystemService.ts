@@ -1,8 +1,9 @@
+import { isTauri } from '@tauri-apps/api/core';
 import { WebFileSystemAdapter } from './webAdapter';
 
 // 环境检测
 const isTauriEnvironment = () => {
-  return typeof window !== 'undefined' && '__TAURI__' in window;
+  return isTauri();
 };
 
 // 动态导入 Tauri API

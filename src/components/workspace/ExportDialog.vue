@@ -91,14 +91,14 @@ const handleExport = async () => {
         console.log('✅ 文档导出成功:', filename)
       } else {
         // 导出整本书
-        const bookName = currentBook.value?.config.name || '未命名书籍'
+        const bookName = currentBook.value?.name || '未命名书籍'
         
         if (mergeDocuments.value) {
           // 合并所有文档
           let mergedContent = `# ${bookName}\n\n`
           
           for (const doc of documents.value) {
-            const content = await app.loadDocumentContent(doc.book_id, doc.id)
+            const content = await app.loadDocumentContent(doc.bookId, doc.id)
             mergedContent += `## ${doc.title}\n\n${content}\n\n---\n\n`
           }
           
@@ -108,7 +108,7 @@ const handleExport = async () => {
         } else {
           // 分别导出每个文档
           for (const doc of documents.value) {
-            const content = await app.loadDocumentContent(doc.book_id, doc.id)
+            const content = await app.loadDocumentContent(doc.bookId, doc.id)
             const filename = `${bookName}_${doc.title}.${ext}`
             await FileSystemService.exportDocument(filename, content, format)
           }

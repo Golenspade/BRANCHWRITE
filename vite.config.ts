@@ -41,6 +41,10 @@ function serveVditorAssets(): Plugin {
 }
 
 export default defineConfig({
+  build: {
+    // Monaco and Vditor are intentional offline editor bundles; keep warnings for larger regressions.
+    chunkSizeWarningLimit: 3000,
+  },
   plugins: [
     vue(),
     wasm(),

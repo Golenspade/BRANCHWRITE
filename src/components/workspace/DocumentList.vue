@@ -41,7 +41,7 @@
           <div class="flex-1 flex items-center justify-between">
             <div class="text-left">
               <div class="font-medium">{{ doc.title }}</div>
-              <div class="text-xs opacity-70">{{ doc.type }}</div>
+              <div class="text-xs opacity-70">{{ doc.documentType }}</div>
             </div>
             <n-popconfirm @positive-click="handleDeleteDocument(doc.id)">
               <template #trigger>
@@ -83,29 +83,29 @@ const showCreateDialog = ref(false)
 
 const handleShowCreateDialog = () => {
   console.log('🔘 点击新建按钮')
-  console.log('📚 当前书籍:', currentBook.value?.config.name)
+  console.log('📚 当前书籍:', currentBook.value?.name)
   console.log('📄 当前文档数量:', documents.value.length)
   showCreateDialog.value = true
 }
 
-const handleSelectDocument = (doc: any) => {
+const handleSelectDocument = async (doc: typeof documents.value[number]) => {
   console.log('📄 选择文档:', doc.title)
-  app.selectDocument(doc)
+  await app.switchDocument(doc.id)
 }
 
 const handleDeleteDocument = async (docId: string) => {
   console.log('🗑️  删除文档:', docId)
-  const bookId = currentBook.value?.config.id
+  const bookId = currentBook.value?.id
   if (!bookId) {
     console.error('❌ 没有书籍ID')
     return
   }
-  await app.deleteDocument(bookId, docId)
+  await app.deleteDocument(docId)
 }
 
 const handleCreateDocument = async (title: string, type: string) => {
   console.log('📝 开始创建文档:', { title, type })
-  const bookId = currentBook.value?.config.id
+  const bookId = currentBook.value?.id
   console.log('📚 当前书籍ID:', bookId)
   if (!bookId) {
     console.error('❌ 没有选择书籍')
@@ -117,7 +117,7 @@ const handleCreateDocument = async (title: string, type: string) => {
     console.log('📄 更新后的文档列表:', documents.value)
     const created = documents.value.find((d) => d.id === result) || documents.value[documents.value.length - 1]
     if (created) {
-      app.selectDocument(created)
+      await app.switchDocument(created.id)
     }
     showCreateDialog.value = false
   } catch (error) {

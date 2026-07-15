@@ -22,20 +22,10 @@
             style="width: 140px"
             data-testid="editor-theme"
           />
-          <n-button
-            v-if="mode === 'source'"
-            size="small"
-            :disabled="!hasDocument"
-            @click="monacoRef?.undo()"
-          >
+          <n-button v-if="mode === 'source'" size="small" :disabled="!hasDocument" @click="monacoRef?.undo()">
             撤销
           </n-button>
-          <n-button
-            v-if="mode === 'source'"
-            size="small"
-            :disabled="!hasDocument"
-            @click="monacoRef?.redo()"
-          >
+          <n-button v-if="mode === 'source'" size="small" :disabled="!hasDocument" @click="monacoRef?.redo()">
             重做
           </n-button>
           <n-button
@@ -51,11 +41,7 @@
       </div>
     </template>
 
-    <div
-      v-if="!hasDocument"
-      class="flex-1 flex items-center justify-center text-gray-400"
-      data-testid="editor-empty"
-    >
+    <div v-if="!hasDocument" class="flex-1 flex items-center justify-center text-gray-400" data-testid="editor-empty">
       <div class="text-center px-6">
         <div class="text-4xl mb-3">📝</div>
         <p class="text-base text-gray-600 mb-1">选择或创建文档开始写作</p>
@@ -66,23 +52,11 @@
     </div>
 
     <div v-show="hasDocument" class="flex-1 flex flex-col min-h-0" data-testid="editor-workspace">
-      <div
-        v-show="mode === 'wysiwyg'"
-        class="flex-1 min-h-0 overflow-hidden"
-        data-testid="editor-wysiwyg-pane"
-      >
-        <WysiwygPane
-          v-if="wysiwygMounted"
-          v-model="documentDraft"
-          @ready="onWysiwygReady"
-        />
+      <div v-show="mode === 'wysiwyg'" class="flex-1 min-h-0 overflow-hidden" data-testid="editor-wysiwyg-pane">
+        <WysiwygPane v-if="wysiwygMounted" v-model="documentDraft" @ready="onWysiwygReady" />
       </div>
 
-      <div
-        v-if="mode === 'source'"
-        class="flex-1 min-h-0"
-        data-testid="editor-source-pane"
-      >
+      <div v-if="mode === 'source'" class="flex-1 min-h-0" data-testid="editor-source-pane">
         <MonacoSourcePane
           ref="monacoRef"
           v-model="documentDraft"
@@ -91,11 +65,7 @@
         />
       </div>
 
-      <div
-        v-show="mode === 'preview'"
-        class="flex-1 min-h-0 overflow-hidden"
-        data-testid="editor-preview-pane"
-      >
+      <div v-show="mode === 'preview'" class="flex-1 min-h-0 overflow-hidden" data-testid="editor-preview-pane">
         <n-scrollbar class="h-full">
           <article
             class="preview-body prose prose-slate max-w-none px-6 py-4"
@@ -105,16 +75,8 @@
         </n-scrollbar>
       </div>
 
-      <div
-        v-if="mode === 'diff'"
-        class="flex-1 min-h-0 overflow-hidden"
-        data-testid="editor-diff-pane"
-      >
-        <DiffPane
-          :old-text="compareText"
-          :new-text="currentDocument"
-          :compare-label="compareLabel"
-        />
+      <div v-if="mode === 'diff'" class="flex-1 min-h-0 overflow-hidden" data-testid="editor-diff-pane">
+        <DiffPane :old-text="compareText" :new-text="currentDocument" :compare-label="compareLabel" />
       </div>
 
       <footer
@@ -126,9 +88,11 @@
           <span v-else-if="mode === 'wysiwyg'">所见即所得</span>
           <span v-else-if="mode === 'preview'">预览</span>
           <span v-else>对比</span>
-          <span class="truncate">{{ currentDocumentConfig?.title }}</span>
+          <span class="truncate">{{ currentDocumentDetail?.title }}</span>
           <span v-if="saveState === 'saving'" class="text-blue-500">保存中…</span>
+          <span v-else-if="saveState === 'pending'" class="text-amber-600">等待保存…</span>
           <span v-else-if="saveState === 'saved'" class="text-green-600">已自动保存</span>
+          <span v-else-if="saveState === 'error'" class="text-red-600">保存失败</span>
         </div>
         <div class="flex items-center gap-3 shrink-0">
           <span>{{ stats.words }} 词</span>
@@ -151,224 +115,107 @@ import { useAppStore } from '../../stores/app'
 import { allEditorThemes } from '../../utils/editorThemes'
 import { computeTextStats } from '../../utils/textStats'
 import DiffPane from './DiffPane.vue'
-import WysiwygPane from './WysiwygPane.vue'
 import MonacoSourcePane from './MonacoSourcePane.vue'
+import WysiwygPane from './WysiwygPane.vue'
 
 type EditorMode = 'wysiwyg' | 'source' | 'preview' | 'diff'
 
 const app = useAppStore()
 const message = useMessage()
 const {
-  currentBook,
-  currentDocument,
-  currentDocumentConfig,
-  commits,
-  currentMode,
+  currentDocument, currentDocumentDetail, commits, currentMode, saveState,
 } = storeToRefs(app)
-
-let saveTimer: number | null = null
-let pendingSave: { bookId: string; docId: string; content: string } | null = null
-let applyingExternal = false
-
 const mode = ref<EditorMode>('wysiwyg')
 const themeId = ref('focus-writing')
 const cursor = ref({ line: 1, column: 1 })
-const saveState = ref<'idle' | 'saving' | 'saved'>('idle')
 const wysiwygMounted = ref(false)
 const documentDraft = ref('')
-const monacoRef = ref<{ undo: () => void; redo: () => void; focus: () => void } | null>(null)
+const monacoRef = ref<{ undo: () => void; redo: () => void } | null>(null)
 
-const hasDocument = computed(() => !!currentDocumentConfig.value)
+const hasDocument = computed(() => !!currentDocumentDetail.value)
 const stats = computed(() => computeTextStats(documentDraft.value || currentDocument.value || ''))
-
-const themeOptions = allEditorThemes.map((t) => ({
-  label: t.name,
-  value: t.id,
-}))
-
+const themeOptions = allEditorThemes.map((theme) => ({ label: theme.name, value: theme.id }))
 const canDiff = computed(() => commits.value.length > 0)
-
 const compareCommit = computed(() => {
-  if (app.selectedCommits.length > 0) {
-    const id = app.selectedCommits[0]
-    return commits.value.find((c) => c.id === id) || commits.value[0] || null
-  }
-  return commits.value[0] || null
+  const selected = app.selectedCommits[0]
+  return commits.value.find((commit) => commit.id === selected) || commits.value[0] || null
 })
-
 const compareText = computed(() => {
   const commit = compareCommit.value
-  if (!commit) return ''
-  return app.getCommitDiff(commit.id)?.content ?? ''
+  return commit ? app.getCommitDiff(commit.id)?.content ?? '' : ''
 })
-
 const compareLabel = computed(() => compareCommit.value?.message || '历史版本')
-
 const previewHtml = computed(() => {
   try {
-    const html = marked.parse(currentDocument.value || '', { async: false }) as string
-    return DOMPurify.sanitize(html)
+    return DOMPurify.sanitize(marked.parse(currentDocument.value || '', { async: false }) as string)
   } catch {
     return '<p>预览渲染失败</p>'
   }
 })
 
 watch(currentMode, (value) => {
-  if (value === 'wysiwyg' || value === 'source' || value === 'preview' || value === 'diff') {
-    mode.value = value
-  } else if (value === 'edit') {
-    mode.value = 'wysiwyg'
-  }
+  if (value === 'edit') mode.value = 'wysiwyg'
+  else mode.value = value
 })
 
 watch(mode, (value) => {
   app.setCurrentMode(value)
-  if (value === 'wysiwyg' || value === 'source') {
-    documentDraft.value = currentDocument.value || ''
+  if (value === 'wysiwyg' || value === 'source') documentDraft.value = currentDocument.value
+  if (value === 'diff' && compareCommit.value && !app.getCommitDiff(compareCommit.value.id)) {
+    void app.loadVersionDetail(compareCommit.value.id).catch(() => {
+      if (mode.value === 'diff') mode.value = 'wysiwyg'
+    })
   }
 })
 
 watch(documentDraft, (value) => {
-  if (mode.value !== 'wysiwyg' && mode.value !== 'source') return
-  if (value === currentDocument.value) return
-  app.setCurrentDocument(value)
-  scheduleSave()
-})
-
-watch(currentDocumentConfig, async (doc) => {
-  await flushPendingSave()
-
-  if (!doc) {
-    wysiwygMounted.value = false
-    return
+  if ((mode.value === 'wysiwyg' || mode.value === 'source') && value !== currentDocument.value) {
+    app.queueDocumentSave(value)
   }
-
-  const bookId = currentBook.value?.config.id
-  if (!bookId) return
-
-  applyingExternal = true
-  try {
-    const content = await app.loadDocumentContent(bookId, doc.id)
-    app.setCurrentDocument(content || '')
-    documentDraft.value = content || ''
-  } finally {
-    applyingExternal = false
-  }
-
-  wysiwygMounted.value = true
 })
 
 watch(currentDocument, (value) => {
-  if (applyingExternal) return
-  if (documentDraft.value !== value) {
-    documentDraft.value = value || ''
-  }
+  if (documentDraft.value !== value) documentDraft.value = value || ''
 })
 
-watch(hasDocument, (ready) => {
-  if (!ready) {
-    wysiwygMounted.value = false
-    return
-  }
-  wysiwygMounted.value = true
-  documentDraft.value = currentDocument.value || ''
-})
+watch(currentDocumentDetail, (detail, previous) => {
+  wysiwygMounted.value = !!detail
+  if (detail?.id !== previous?.id) documentDraft.value = currentDocument.value || detail?.content || ''
+}, { immediate: true })
 
-onMounted(() => {
-  window.addEventListener('keydown', handleGlobalShortcuts)
-  if (hasDocument.value) {
-    wysiwygMounted.value = true
-    documentDraft.value = currentDocument.value || ''
-  }
-})
-
+onMounted(() => window.addEventListener('keydown', handleGlobalShortcuts))
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleGlobalShortcuts)
-  void flushPendingSave()
+  void app.flushDocumentSave().catch(() => undefined)
 })
 
-function onWysiwygReady() {
-  documentDraft.value = currentDocument.value || ''
-}
-
-function onCursor(value: { line: number; column: number }) {
-  cursor.value = value
-}
+function onWysiwygReady() { documentDraft.value = currentDocument.value || '' }
+function onCursor(value: { line: number; column: number }) { cursor.value = value }
 
 function handleGlobalShortcuts(event: KeyboardEvent) {
   const isMod = event.ctrlKey || event.metaKey
   if (!isMod || event.shiftKey || event.altKey) return
-
-  if (event.code === 'Digit1') {
+  const modes: Partial<Record<string, EditorMode>> = {
+    Digit1: 'wysiwyg', Digit2: 'source', Digit3: 'preview', Digit4: 'diff',
+  }
+  const target = modes[event.code]
+  if (target) {
     event.preventDefault()
-    mode.value = 'wysiwyg'
-  } else if (event.code === 'Digit2') {
-    event.preventDefault()
-    mode.value = 'source'
-  } else if (event.code === 'Digit3') {
-    event.preventDefault()
-    mode.value = 'preview'
-  } else if (event.code === 'Digit4') {
-    event.preventDefault()
-    if (canDiff.value) mode.value = 'diff'
+    if (target !== 'diff' || canDiff.value) mode.value = target
     else message.warning('请先保存一个版本后再对比')
-  } else if (event.code === 'KeyS') {
-    if (mode.value === 'wysiwyg' || mode.value === 'source') {
-      event.preventDefault()
-      void saveVersion()
-    }
-  }
-}
-
-function scheduleSave() {
-  if (saveTimer) window.clearTimeout(saveTimer)
-  const bookId = currentBook.value?.config.id
-  const docId = currentDocumentConfig.value?.id
-  if (!bookId || !docId) return
-
-  pendingSave = {
-    bookId,
-    docId,
-    content: currentDocument.value,
-  }
-  saveState.value = 'idle'
-  saveTimer = window.setTimeout(() => {
-    void flushPendingSave()
-  }, 1200)
-}
-
-async function flushPendingSave() {
-  if (saveTimer) window.clearTimeout(saveTimer)
-  saveTimer = null
-
-  const save = pendingSave
-  pendingSave = null
-  if (!save) return
-
-  saveState.value = 'saving'
-  try {
-    await app.saveDocumentContent(save.bookId, save.docId, save.content)
-    saveState.value = 'saved'
-  } catch {
-    saveState.value = 'idle'
-    message.error('自动保存失败')
+  } else if (event.code === 'KeyS' && (mode.value === 'wysiwyg' || mode.value === 'source')) {
+    event.preventDefault()
+    void saveVersion()
   }
 }
 
 async function saveVersion() {
   if (!hasDocument.value) return
-  const bookId = currentBook.value?.config.id
-  const docId = currentDocumentConfig.value?.id
-  if (!bookId || !docId) return
-
-  const msg = window.prompt('请输入版本描述：', '手动保存')
-  if (!msg || !msg.trim()) return
-
+  const value = window.prompt('请输入版本描述：', '手动保存')
+  if (!value?.trim()) return
   try {
-    await app.saveDocumentContent(bookId, docId, currentDocument.value)
-    app.createCommit(msg.trim())
+    await app.createVersion(value.trim())
     message.success('版本已保存')
-    saveState.value = 'saved'
   } catch {
     message.error('保存版本失败')
   }
@@ -376,40 +223,13 @@ async function saveVersion() {
 </script>
 
 <style scoped>
-.editor-card {
-  min-height: 0;
-}
-
-.editor-card :deep(.n-card-header) {
-  padding: 10px 12px;
-  border-bottom: 1px solid #eee;
-}
-
+.editor-card { min-height: 0; }
+.editor-card :deep(.n-card-header) { padding: 10px 12px; border-bottom: 1px solid #eee; }
 .preview-body :deep(h1),
 .preview-body :deep(h2),
-.preview-body :deep(h3) {
-  margin-top: 1.2em;
-  margin-bottom: 0.5em;
-  font-weight: 700;
-}
-
-.preview-body :deep(p) {
-  margin: 0.75em 0;
-  line-height: 1.75;
-}
-
-.preview-body :deep(pre) {
-  background: #f6f8fa;
-  padding: 12px;
-  border-radius: 6px;
-  overflow: auto;
-}
-
-.preview-body :deep(code) {
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-}
-
-.status-bar {
-  min-height: 28px;
-}
+.preview-body :deep(h3) { margin-top: 1.2em; margin-bottom: 0.5em; font-weight: 700; }
+.preview-body :deep(p) { margin: 0.75em 0; line-height: 1.75; }
+.preview-body :deep(pre) { background: #f6f8fa; padding: 12px; border-radius: 6px; overflow: auto; }
+.preview-body :deep(code) { font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+.status-bar { min-height: 28px; }
 </style>
