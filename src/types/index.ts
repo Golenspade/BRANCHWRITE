@@ -48,7 +48,7 @@ export interface AppState {
   isHistoryPanelOpen: boolean;
   isDiffViewOpen: boolean;
   selectedCommits: string[];
-  currentMode: 'edit' | 'preview' | 'diff';
+  currentMode: 'edit' | 'preview' | 'diff' | 'wysiwyg' | 'source';
   isLoading: boolean;
   error: string | null;
 }

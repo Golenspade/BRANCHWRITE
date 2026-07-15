@@ -25,9 +25,14 @@ import {
   NPopconfirm,
   NMessageProvider,
   NRadio,
+  NRadioButton,
   NRadioGroup,
   NCheckbox,
-  NCheckboxGroup
+  NCheckboxGroup,
+  NScrollbar,
+  NList,
+  NListItem,
+  NThing,
 } from 'naive-ui'
 
 const naive = create({
@@ -50,9 +55,14 @@ const naive = create({
     NPopconfirm,
     NMessageProvider,
     NRadio,
+    NRadioButton,
     NRadioGroup,
     NCheckbox,
-    NCheckboxGroup
+    NCheckboxGroup,
+    NScrollbar,
+    NList,
+    NListItem,
+    NThing,
   ]
 })
 

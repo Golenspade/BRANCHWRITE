@@ -17,6 +17,7 @@
           v-model:value="formData.title"
           placeholder="例如：第一章"
           size="large"
+          data-testid="doc-title-input"
         />
       </n-form-item>
 
@@ -32,7 +33,7 @@
     <template #footer>
       <n-space justify="end">
         <n-button @click="handleClose">取消</n-button>
-        <n-button type="primary" @click="handleSubmit" :loading="isSubmitting">
+        <n-button type="primary" @click="handleSubmit" :loading="isSubmitting" data-testid="submit-doc-btn">
           创建文档
         </n-button>
       </n-space>

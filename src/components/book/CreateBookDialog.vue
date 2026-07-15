@@ -18,6 +18,7 @@
           v-model:value="formData.name"
           placeholder="例如：我的第一本小说"
           size="large"
+          data-testid="book-name-input"
         />
       </n-form-item>
 
@@ -28,6 +29,7 @@
               v-model:value="formData.author"
               placeholder="作者姓名"
               size="large"
+              data-testid="book-author-input"
             />
           </n-form-item>
         </n-grid-item>
@@ -58,7 +60,7 @@
         <n-button @click="handleClose">
           取消
         </n-button>
-        <n-button type="primary" @click="handleSubmit" :loading="isSubmitting">
+        <n-button type="primary" @click="handleSubmit" :loading="isSubmitting" data-testid="submit-book-btn">
           创建书籍
         </n-button>
       </n-space>

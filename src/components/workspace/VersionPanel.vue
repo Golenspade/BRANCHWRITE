@@ -42,6 +42,7 @@
             <template #action>
               <n-space :size="4">
                 <n-button size="tiny" @click="handleViewVersion(commit)">查看</n-button>
+                <n-button size="tiny" data-testid="compare-version-btn" @click="handleCompareVersion(commit)">对比</n-button>
                 <n-button v-if="index !== 0" size="tiny" type="warning" @click="handleRevertToVersion(commit)">
                   回滚
                 </n-button>
@@ -122,6 +123,11 @@ const handleViewVersion = (commit: CommitInfo) => {
   const diff = app.getCommitDiff(commit.id)
   selectedVersionContent.value = diff?.content || '内容不可用'
   showVersionDetail.value = true
+}
+
+const handleCompareVersion = (commit: CommitInfo) => {
+  app.setSelectedCommits([commit.id])
+  app.setCurrentMode('diff')
 }
 
 const handleRevertToVersion = (commit: CommitInfo) => {

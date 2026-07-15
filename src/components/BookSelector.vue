@@ -15,6 +15,7 @@
           <n-button
             type="primary"
             size="large"
+            data-testid="create-book-btn"
             @click="showCreateDialog = true"
           >
             <template #icon>
