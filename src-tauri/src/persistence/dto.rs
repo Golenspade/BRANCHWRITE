@@ -16,6 +16,31 @@ pub struct Book {
     pub updated_at_ms: i64,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateBookInput {
+    pub name: String,
+    pub description: String,
+    pub author: String,
+    pub genre: String,
+    pub cover_image: Option<String>,
+    pub tags: Vec<String>,
+    pub settings: Value,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateBookInput {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub author: String,
+    pub genre: String,
+    pub cover_image: Option<String>,
+    pub tags: Vec<String>,
+    pub settings: Value,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DocumentSummary {
@@ -50,6 +75,36 @@ pub struct DocumentDetail {
     pub updated_at_ms: i64,
     pub content: String,
     pub content_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateDocumentInput {
+    pub book_id: String,
+    pub title: String,
+    pub sort_order: i64,
+    pub document_type: String,
+    pub status: String,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateDocumentMetadataInput {
+    pub document_id: String,
+    pub title: String,
+    pub sort_order: i64,
+    pub document_type: String,
+    pub status: String,
+    pub expected_revision: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveDocumentInput {
+    pub document_id: String,
+    pub content: String,
+    pub expected_revision: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

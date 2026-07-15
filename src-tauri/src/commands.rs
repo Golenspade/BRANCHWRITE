@@ -1,3 +1,5 @@
+#![allow(dead_code)] // Legacy book/document functions remain unregistered during the gateway cutover.
+
 use crate::file_system::{FileSystemManager, ProjectConfig, ProjectData, BookConfig, BookData, DocumentConfig};
 use anyhow::Result;
 use serde_json::Value;
@@ -319,7 +321,6 @@ pub async fn get_desktop_dir() -> Result<String, String> {
 // ===== 书籍管理命令 =====
 
 /// 创建新书籍
-#[tauri::command]
 pub async fn create_book(
     state: State<'_, AppState>,
     name: String,
@@ -335,7 +336,6 @@ pub async fn create_book(
 }
 
 /// 列出所有书籍
-#[tauri::command]
 pub async fn list_books(
     state: State<'_, AppState>,
 ) -> Result<Vec<BookConfig>, String> {
@@ -347,7 +347,6 @@ pub async fn list_books(
 }
 
 /// 加载书籍
-#[tauri::command]
 pub async fn load_book(
     state: State<'_, AppState>,
     book_id: String,
@@ -360,7 +359,6 @@ pub async fn load_book(
 }
 
 /// 保存书籍
-#[tauri::command]
 pub async fn save_book(
     state: State<'_, AppState>,
     book_data: BookData,
@@ -373,7 +371,6 @@ pub async fn save_book(
 }
 
 /// 删除书籍
-#[tauri::command]
 pub async fn delete_book(
     state: State<'_, AppState>,
     book_id: String,
@@ -388,7 +385,6 @@ pub async fn delete_book(
 // ===== 文档管理命令 =====
 
 /// 创建新文档
-#[tauri::command]
 pub async fn create_document(
     state: State<'_, AppState>,
     book_id: String,
@@ -403,7 +399,6 @@ pub async fn create_document(
 }
 
 /// 列出书籍的所有文档
-#[tauri::command]
 pub async fn list_documents(
     state: State<'_, AppState>,
     book_id: String,
@@ -416,7 +411,6 @@ pub async fn list_documents(
 }
 
 /// 加载文档内容
-#[tauri::command]
 pub async fn load_document(
     state: State<'_, AppState>,
     book_id: String,
@@ -430,7 +424,6 @@ pub async fn load_document(
 }
 
 /// 保存文档内容
-#[tauri::command]
 pub async fn save_document(
     state: State<'_, AppState>,
     book_id: String,
@@ -445,7 +438,6 @@ pub async fn save_document(
 }
 
 /// 删除文档
-#[tauri::command]
 pub async fn delete_document(
     state: State<'_, AppState>,
     book_id: String,

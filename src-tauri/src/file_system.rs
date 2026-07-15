@@ -1,3 +1,5 @@
+#![allow(dead_code)] // Legacy book/document types are retained but no longer active commands.
+
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -166,12 +168,6 @@ impl FileSystemManager {
         if !projects_dir.exists() {
             fs::create_dir_all(&projects_dir)
                 .context("Failed to create projects directory")?;
-        }
-
-        // 确保书籍目录存在
-        if !books_dir.exists() {
-            fs::create_dir_all(&books_dir)
-                .context("Failed to create books directory")?;
         }
 
         Ok(Self { projects_dir, books_dir })

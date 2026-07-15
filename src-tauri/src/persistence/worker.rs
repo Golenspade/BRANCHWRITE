@@ -7,6 +7,12 @@ use std::thread::{self, JoinHandle};
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
 
+mod client;
+mod dispatch;
+mod requests;
+
+pub use requests::Request;
+
 pub const DATABASE_FILE_NAME: &str = "branchwrite-v2.sqlite3";
 pub const MINIMUM_SQLITE_VERSION: &str = "3.51.3";
 pub const REQUEST_QUEUE_CAPACITY: usize = 64;
@@ -27,15 +33,6 @@ pub struct Health {
     pub busy_timeout_ms: i64,
     pub locking_mode: String,
     pub wal_autocheckpoint: i64,
-}
-
-pub enum Request {
-    Health {
-        respond_to: oneshot::Sender<Result<Health, PersistenceError>>,
-    },
-    Shutdown {
-        respond_to: oneshot::Sender<Result<(), PersistenceError>>,
-    },
 }
 
 pub struct PersistenceWorker {
@@ -140,7 +137,7 @@ fn worker_loop(
     mut receiver: mpsc::Receiver<Request>,
     startup_sender: std::sync::mpsc::SyncSender<Result<(), PersistenceError>>,
 ) {
-    let connection = match open_and_prepare(&path) {
+    let mut connection = match open_and_prepare(&path) {
         Ok(result) => result,
         Err(error) => {
             let _ = startup_sender.send(Err(error));
@@ -151,14 +148,8 @@ fn worker_loop(
         return;
     }
     while let Some(request) = receiver.blocking_recv() {
-        match request {
-            Request::Health { respond_to } => {
-                let _ = respond_to.send(read_health(&connection));
-            }
-            Request::Shutdown { respond_to } => {
-                let _ = respond_to.send(Ok(()));
-                break;
-            }
+        if dispatch::handle(&mut connection, request) {
+            break;
         }
     }
 }

@@ -50,21 +50,41 @@ worker also closes the queue and joins the thread deterministically.
 
 ## Typed command boundary
 
-Task 1 exposes only the internal typed `Health` and `Shutdown` worker requests.
-`Health` returns the SQLite version, migration version, worker thread name, and
-verified PRAGMA values. Failures cross the boundary as camelCase-serialized
-`PersistenceError { code, message, retryable }`; codes are `databaseBusy`,
-`conflict`, `notFound`, `validation`, `migrationFailed`, `storageUnavailable`,
-and `internal`.
+The worker exposes one explicit typed request for health, shutdown, and each
+book/document operation. The registered Tauri book/document commands use the
+SQLite worker only: `list_books`, `get_book`, `create_book`, `update_book`,
+`delete_book`, `list_documents`, `get_document`, `create_document`,
+`update_document_metadata`, `save_document`, and `delete_document`. Legacy
+filesystem book/document functions, project commands, and the legacy
+`.branchwrite` app-data path command are not registered. Production builder
+construction does not initialize `FileSystemManager` or probe/create the legacy
+storage tree.
 
-Shared book, document, and version DTOs serialize camelCase names and use signed
-64-bit epoch-millisecond timestamp fields. No untyped SQL string or connection
-handle crosses the Rust boundary.
+Shared input and output DTOs serialize camelCase names and use signed 64-bit
+epoch-millisecond timestamp fields. Document summaries omit content and hashes;
+document details include both. Failures cross the boundary as camelCase-
+serialized `PersistenceError { code, message, retryable }`; codes are
+`databaseBusy`, `conflict`, `notFound`, `validation`, `migrationFailed`,
+`storageUnavailable`, and `internal`. No untyped SQL string or connection handle
+crosses the Rust boundary.
+
+## Book and document mutations
+
+Rust generates UUIDs and timestamps and computes SHA-256, Unicode-scalar
+character counts, and Unicode-whitespace word counts. Every create, update,
+save, and delete uses an `IMMEDIATE` transaction. Book metadata updates replace
+all metadata fields, and permanent book deletion cascades to its documents and
+versions.
+
+Document metadata updates and content saves compare `expectedRevision` inside
+the same transaction that performs the write. A stale revision is a conflict,
+including when the proposed values otherwise match. A current no-op returns the
+unchanged detail without incrementing its revision; each changed update
+increments the revision exactly once.
 
 ## Explicit exclusions
 
-- No book, document, save, restore, or version-list domain handler is part of
-  this foundation task.
+- No restore or document-version domain handler is registered yet.
 - No raw SQL command is registered or exposed to frontend code.
 - No automatic version origin or automatic version creation is supported.
 - No legacy file, browser `localStorage` value, or `branchwrite.db` database is

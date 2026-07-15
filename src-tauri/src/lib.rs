@@ -2,24 +2,14 @@ mod file_system;
 mod commands;
 pub mod persistence;
 
-use commands::AppState;
 use persistence::worker::PersistenceWorker;
 use tauri::Manager;
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
+pub fn active_builder() -> tauri::Builder<tauri::Wry> {
   tauri::Builder::default()
     .plugin(tauri_plugin_fs::init())
     .plugin(tauri_plugin_dialog::init())
-    .manage(AppState::new().expect("Failed to initialize app state"))
     .invoke_handler(tauri::generate_handler![
-      commands::create_project,
-      commands::save_project,
-      commands::load_project,
-      commands::list_projects,
-      commands::delete_project,
-      commands::export_project,
-      commands::get_project_stats,
       commands::select_folder,
       commands::select_file,
       commands::show_message,
@@ -29,22 +19,25 @@ pub fn run() {
       commands::write_file,
       commands::get_file_info,
       commands::list_directory,
-      commands::get_app_data_dir,
       commands::get_documents_dir,
       commands::get_desktop_dir,
-      // 书籍管理命令
-      commands::create_book,
-      commands::list_books,
-      commands::load_book,
-      commands::save_book,
-      commands::delete_book,
-      // 文档管理命令
-      commands::create_document,
-      commands::list_documents,
-      commands::load_document,
-      commands::save_document,
-      commands::delete_document,
+      persistence::commands::list_books,
+      persistence::commands::get_book,
+      persistence::commands::create_book,
+      persistence::commands::update_book,
+      persistence::commands::delete_book,
+      persistence::commands::list_documents,
+      persistence::commands::get_document,
+      persistence::commands::create_document,
+      persistence::commands::update_document_metadata,
+      persistence::commands::save_document,
+      persistence::commands::delete_document,
     ])
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+  active_builder()
     .setup(|app| {
       let app_data_dir = app.path().app_data_dir()?;
       let persistence = PersistenceWorker::start(app_data_dir)
