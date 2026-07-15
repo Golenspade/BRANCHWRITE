@@ -56,7 +56,7 @@ fn production_registration_excludes_every_legacy_state_command() {
 }
 
 #[test]
-fn production_registers_all_eleven_typed_persistence_commands() {
+fn production_registers_all_fifteen_typed_persistence_commands() {
     for required in [
         "list_books",
         "get_book",
@@ -69,6 +69,10 @@ fn production_registers_all_eleven_typed_persistence_commands() {
         "update_document_metadata",
         "save_document",
         "delete_document",
+        "list_versions",
+        "get_version",
+        "create_version",
+        "restore_version",
     ] {
         let registration = format!("persistence::commands::{required},");
         assert!(

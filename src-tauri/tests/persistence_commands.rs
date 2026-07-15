@@ -1,8 +1,18 @@
 use app_lib::persistence::dto::{
-    CreateBookInput, CreateDocumentInput, SaveDocumentInput, UpdateBookInput,
-    UpdateDocumentMetadataInput,
+    CreateBookInput, CreateDocumentInput, CreateVersionInput, RestoreVersionInput,
+    RestoreVersionResult, SaveDocumentInput, UpdateBookInput, UpdateDocumentMetadataInput,
 };
 use serde_json::json;
+
+mod support;
+#[path = "persistence_versions/create.rs"]
+mod version_create;
+#[path = "persistence_versions/isolation.rs"]
+mod version_isolation;
+#[path = "persistence_versions/restore.rs"]
+mod version_restore;
+#[path = "persistence_versions/test_support.rs"]
+mod version_test_support;
 
 #[test]
 fn input_dtos_round_trip_with_camel_case_fields() {
@@ -69,4 +79,41 @@ fn input_dtos_round_trip_with_camel_case_fields() {
     assert_eq!(metadata_json["documentId"], json!("document"));
     assert_eq!(metadata_json["expectedRevision"], json!(4));
     assert!(metadata_json.get("expected_revision").is_none());
+}
+
+#[test]
+fn version_command_dtos_round_trip_with_frozen_camel_case_shape() {
+    let create: CreateVersionInput = serde_json::from_value(json!({
+        "operationId": "00000000-0000-4000-8000-000000000001",
+        "documentId": "document",
+        "content": "text",
+        "message": "Manual save",
+        "expectedRevision": 3
+    }))
+    .unwrap();
+    assert_eq!(create.document_id, "document");
+    assert_eq!(create.expected_revision, 3);
+
+    let restore: RestoreVersionInput = serde_json::from_value(json!({
+        "operationId": "00000000-0000-4000-8000-000000000002",
+        "documentId": "document",
+        "targetVersionId": "version",
+        "expectedRevision": 4
+    }))
+    .unwrap();
+    assert_eq!(restore.target_version_id, "version");
+
+    let noop = RestoreVersionResult {
+        already_current: true,
+        safety_version: None,
+        restored_version: None,
+    };
+    assert_eq!(
+        serde_json::to_value(noop).unwrap(),
+        json!({
+            "alreadyCurrent": true,
+            "safetyVersion": null,
+            "restoredVersion": null
+        })
+    );
 }

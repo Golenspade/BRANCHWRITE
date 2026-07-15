@@ -1,7 +1,8 @@
 use super::Health;
 use crate::persistence::dto::{
-    Book, CreateBookInput, CreateDocumentInput, DocumentDetail, DocumentSummary, PersistenceError,
-    SaveDocumentInput, UpdateBookInput, UpdateDocumentMetadataInput,
+    Book, CreateBookInput, CreateDocumentInput, CreateVersionInput, DocumentDetail,
+    DocumentSummary, PersistenceError, RestoreVersionInput, RestoreVersionResult,
+    SaveDocumentInput, UpdateBookInput, UpdateDocumentMetadataInput, VersionDetail, VersionSummary,
 };
 use tokio::sync::oneshot;
 
@@ -51,6 +52,23 @@ pub enum Request {
     DeleteDocument {
         id: String,
         respond_to: oneshot::Sender<Result<(), PersistenceError>>,
+    },
+    ListVersions {
+        document_id: String,
+        respond_to: oneshot::Sender<Result<Vec<VersionSummary>, PersistenceError>>,
+    },
+    GetVersion {
+        document_id: String,
+        version_id: String,
+        respond_to: oneshot::Sender<Result<VersionDetail, PersistenceError>>,
+    },
+    CreateVersion {
+        input: CreateVersionInput,
+        respond_to: oneshot::Sender<Result<VersionDetail, PersistenceError>>,
+    },
+    RestoreVersion {
+        input: RestoreVersionInput,
+        respond_to: oneshot::Sender<Result<RestoreVersionResult, PersistenceError>>,
     },
     Shutdown {
         respond_to: oneshot::Sender<Result<(), PersistenceError>>,

@@ -1,7 +1,8 @@
 use super::{worker_unavailable, PersistenceWorker, Request};
 use crate::persistence::dto::{
-    Book, CreateBookInput, CreateDocumentInput, DocumentDetail, DocumentSummary, PersistenceError,
-    SaveDocumentInput, UpdateBookInput, UpdateDocumentMetadataInput,
+    Book, CreateBookInput, CreateDocumentInput, CreateVersionInput, DocumentDetail,
+    DocumentSummary, PersistenceError, RestoreVersionInput, RestoreVersionResult,
+    SaveDocumentInput, UpdateBookInput, UpdateDocumentMetadataInput, VersionDetail, VersionSummary,
 };
 use tokio::sync::oneshot;
 
@@ -126,6 +127,66 @@ impl PersistenceWorker {
         let (respond_to, response) = oneshot::channel();
         sender
             .send(Request::DeleteDocument { id, respond_to })
+            .await
+            .map_err(|_| worker_unavailable())?;
+        response.await.map_err(|_| worker_unavailable())?
+    }
+
+    pub async fn list_versions(
+        &self,
+        document_id: String,
+    ) -> Result<Vec<VersionSummary>, PersistenceError> {
+        let sender = self.sender.as_ref().ok_or_else(worker_unavailable)?;
+        let (respond_to, response) = oneshot::channel();
+        sender
+            .send(Request::ListVersions {
+                document_id,
+                respond_to,
+            })
+            .await
+            .map_err(|_| worker_unavailable())?;
+        response.await.map_err(|_| worker_unavailable())?
+    }
+
+    pub async fn get_version(
+        &self,
+        document_id: String,
+        version_id: String,
+    ) -> Result<VersionDetail, PersistenceError> {
+        let sender = self.sender.as_ref().ok_or_else(worker_unavailable)?;
+        let (respond_to, response) = oneshot::channel();
+        sender
+            .send(Request::GetVersion {
+                document_id,
+                version_id,
+                respond_to,
+            })
+            .await
+            .map_err(|_| worker_unavailable())?;
+        response.await.map_err(|_| worker_unavailable())?
+    }
+
+    pub async fn create_version(
+        &self,
+        input: CreateVersionInput,
+    ) -> Result<VersionDetail, PersistenceError> {
+        let sender = self.sender.as_ref().ok_or_else(worker_unavailable)?;
+        let (respond_to, response) = oneshot::channel();
+        sender
+            .send(Request::CreateVersion { input, respond_to })
+            .await
+            .map_err(|_| worker_unavailable())?;
+        response.await.map_err(|_| worker_unavailable())?
+    }
+
+    pub async fn restore_version(
+        &self,
+        input: RestoreVersionInput,
+    ) -> Result<RestoreVersionResult, PersistenceError> {
+        let sender = self.sender.as_ref().ok_or_else(worker_unavailable)?;
+        let (respond_to, response) = oneshot::channel();
+        sender
+            .send(Request::RestoreVersion { input, respond_to })
             .await
             .map_err(|_| worker_unavailable())?;
         response.await.map_err(|_| worker_unavailable())?

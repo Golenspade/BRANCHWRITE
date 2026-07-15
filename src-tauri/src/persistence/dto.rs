@@ -142,6 +142,33 @@ pub struct VersionDetail {
     pub content: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateVersionInput {
+    pub operation_id: String,
+    pub document_id: String,
+    pub content: String,
+    pub message: String,
+    pub expected_revision: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RestoreVersionInput {
+    pub operation_id: String,
+    pub document_id: String,
+    pub target_version_id: String,
+    pub expected_revision: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RestoreVersionResult {
+    pub already_current: bool,
+    pub safety_version: Option<VersionSummary>,
+    pub restored_version: Option<VersionSummary>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum PersistenceErrorCode {

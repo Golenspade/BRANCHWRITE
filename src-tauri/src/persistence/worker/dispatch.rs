@@ -1,5 +1,5 @@
 use super::{read_health, Request};
-use crate::persistence::domain::{books, documents};
+use crate::persistence::domain::{books, documents, versions};
 use rusqlite::Connection;
 
 pub fn handle(connection: &mut Connection, request: Request) -> bool {
@@ -42,6 +42,25 @@ pub fn handle(connection: &mut Connection, request: Request) -> bool {
         }
         Request::DeleteDocument { id, respond_to } => {
             let _ = respond_to.send(documents::delete(connection, &id));
+        }
+        Request::ListVersions {
+            document_id,
+            respond_to,
+        } => {
+            let _ = respond_to.send(versions::list(connection, &document_id));
+        }
+        Request::GetVersion {
+            document_id,
+            version_id,
+            respond_to,
+        } => {
+            let _ = respond_to.send(versions::get(connection, &document_id, &version_id));
+        }
+        Request::CreateVersion { input, respond_to } => {
+            let _ = respond_to.send(versions::create(connection, input));
+        }
+        Request::RestoreVersion { input, respond_to } => {
+            let _ = respond_to.send(versions::restore(connection, input));
         }
         Request::Shutdown { respond_to } => {
             let _ = respond_to.send(Ok(()));

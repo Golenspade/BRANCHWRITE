@@ -1,5 +1,6 @@
 pub mod books;
 pub mod documents;
+pub mod versions;
 
 use super::dto::{PersistenceError, PersistenceErrorCode};
 use rusqlite::ErrorCode;

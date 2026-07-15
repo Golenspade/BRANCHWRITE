@@ -32,6 +32,10 @@ pub fn active_builder() -> tauri::Builder<tauri::Wry> {
       persistence::commands::update_document_metadata,
       persistence::commands::save_document,
       persistence::commands::delete_document,
+      persistence::commands::list_versions,
+      persistence::commands::get_version,
+      persistence::commands::create_version,
+      persistence::commands::restore_version,
     ])
 }
 

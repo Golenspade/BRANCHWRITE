@@ -1,6 +1,7 @@
 use super::dto::{
-    Book, CreateBookInput, CreateDocumentInput, DocumentDetail, DocumentSummary, PersistenceError,
-    SaveDocumentInput, UpdateBookInput, UpdateDocumentMetadataInput,
+    Book, CreateBookInput, CreateDocumentInput, CreateVersionInput, DocumentDetail,
+    DocumentSummary, PersistenceError, RestoreVersionInput, RestoreVersionResult,
+    SaveDocumentInput, UpdateBookInput, UpdateDocumentMetadataInput, VersionDetail, VersionSummary,
 };
 use super::worker::PersistenceWorker;
 use tauri::State;
@@ -90,4 +91,37 @@ pub async fn delete_document(
     document_id: String,
 ) -> Result<(), PersistenceError> {
     state.delete_document(document_id).await
+}
+
+#[tauri::command]
+pub async fn list_versions(
+    state: State<'_, PersistenceWorker>,
+    document_id: String,
+) -> Result<Vec<VersionSummary>, PersistenceError> {
+    state.list_versions(document_id).await
+}
+
+#[tauri::command]
+pub async fn get_version(
+    state: State<'_, PersistenceWorker>,
+    document_id: String,
+    version_id: String,
+) -> Result<VersionDetail, PersistenceError> {
+    state.get_version(document_id, version_id).await
+}
+
+#[tauri::command]
+pub async fn create_version(
+    state: State<'_, PersistenceWorker>,
+    input: CreateVersionInput,
+) -> Result<VersionDetail, PersistenceError> {
+    state.create_version(input).await
+}
+
+#[tauri::command]
+pub async fn restore_version(
+    state: State<'_, PersistenceWorker>,
+    input: RestoreVersionInput,
+) -> Result<RestoreVersionResult, PersistenceError> {
+    state.restore_version(input).await
 }
