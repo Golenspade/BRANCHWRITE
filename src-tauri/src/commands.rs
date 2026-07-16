@@ -1,6 +1,8 @@
 #![allow(dead_code)] // Legacy book/document functions remain unregistered during the gateway cutover.
 
-use crate::file_system::{FileSystemManager, ProjectConfig, ProjectData, BookConfig, BookData, DocumentConfig};
+use crate::file_system::{
+    BookConfig, BookData, DocumentConfig, FileSystemManager, ProjectConfig, ProjectData,
+};
 use anyhow::Result;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -30,7 +32,7 @@ pub async fn create_project(
     author: String,
 ) -> Result<ProjectData, String> {
     let file_manager = state.file_manager.lock().map_err(|e| e.to_string())?;
-    
+
     file_manager
         .create_project(&name, &description, &author)
         .map_err(|e| e.to_string())
@@ -43,7 +45,7 @@ pub async fn save_project(
     project_data: ProjectData,
 ) -> Result<(), String> {
     let file_manager = state.file_manager.lock().map_err(|e| e.to_string())?;
-    
+
     file_manager
         .save_project(&project_data)
         .map_err(|e| e.to_string())
@@ -56,7 +58,7 @@ pub async fn load_project(
     project_id: String,
 ) -> Result<ProjectData, String> {
     let file_manager = state.file_manager.lock().map_err(|e| e.to_string())?;
-    
+
     file_manager
         .load_project(&project_id)
         .map_err(|e| e.to_string())
@@ -64,24 +66,17 @@ pub async fn load_project(
 
 /// 列出所有项目
 #[tauri::command]
-pub async fn list_projects(
-    state: State<'_, AppState>,
-) -> Result<Vec<ProjectConfig>, String> {
+pub async fn list_projects(state: State<'_, AppState>) -> Result<Vec<ProjectConfig>, String> {
     let file_manager = state.file_manager.lock().map_err(|e| e.to_string())?;
-    
-    file_manager
-        .list_projects()
-        .map_err(|e| e.to_string())
+
+    file_manager.list_projects().map_err(|e| e.to_string())
 }
 
 /// 删除项目
 #[tauri::command]
-pub async fn delete_project(
-    state: State<'_, AppState>,
-    project_id: String,
-) -> Result<(), String> {
+pub async fn delete_project(state: State<'_, AppState>, project_id: String) -> Result<(), String> {
     let file_manager = state.file_manager.lock().map_err(|e| e.to_string())?;
-    
+
     file_manager
         .delete_project(&project_id)
         .map_err(|e| e.to_string())
@@ -96,7 +91,7 @@ pub async fn export_project(
 ) -> Result<(), String> {
     let file_manager = state.file_manager.lock().map_err(|e| e.to_string())?;
     let path = PathBuf::from(export_path);
-    
+
     file_manager
         .export_project(&project_id, &path)
         .map_err(|e| e.to_string())
@@ -109,7 +104,7 @@ pub async fn get_project_stats(
     project_id: String,
 ) -> Result<HashMap<String, Value>, String> {
     let file_manager = state.file_manager.lock().map_err(|e| e.to_string())?;
-    
+
     file_manager
         .get_project_stats(&project_id)
         .map_err(|e| e.to_string())
@@ -118,18 +113,16 @@ pub async fn get_project_stats(
 /// 选择文件夹对话框
 #[tauri::command]
 pub async fn select_folder(app: tauri::AppHandle) -> Result<Option<String>, String> {
-    use tauri_plugin_dialog::DialogExt;
     use std::sync::{Arc, Mutex};
+    use tauri_plugin_dialog::DialogExt;
 
     let result = Arc::new(Mutex::new(None));
     let result_clone = result.clone();
 
-    app.dialog()
-        .file()
-        .pick_folder(move |path| {
-            let mut result = result_clone.lock().unwrap();
-            *result = path.map(|p| p.to_string());
-        });
+    app.dialog().file().pick_folder(move |path| {
+        let mut result = result_clone.lock().unwrap();
+        *result = path.map(|p| p.to_string());
+    });
 
     // 等待一小段时间让对话框完成
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
@@ -140,9 +133,12 @@ pub async fn select_folder(app: tauri::AppHandle) -> Result<Option<String>, Stri
 
 /// 选择文件对话框
 #[tauri::command]
-pub async fn select_file(app: tauri::AppHandle, filters: Vec<(String, Vec<String>)>) -> Result<Option<String>, String> {
-    use tauri_plugin_dialog::DialogExt;
+pub async fn select_file(
+    app: tauri::AppHandle,
+    filters: Vec<(String, Vec<String>)>,
+) -> Result<Option<String>, String> {
     use std::sync::{Arc, Mutex};
+    use tauri_plugin_dialog::DialogExt;
 
     let result = Arc::new(Mutex::new(None));
     let result_clone = result.clone();
@@ -226,22 +222,25 @@ pub async fn write_file(path: String, content: String) -> Result<(), String> {
 pub async fn get_file_info(path: String) -> Result<HashMap<String, Value>, String> {
     use std::fs;
     use std::path::Path;
-    
+
     let path = Path::new(&path);
     let metadata = fs::metadata(path).map_err(|e| e.to_string())?;
-    
+
     let mut info = HashMap::new();
     info.insert("exists".to_string(), Value::Bool(path.exists()));
     info.insert("is_file".to_string(), Value::Bool(metadata.is_file()));
     info.insert("is_dir".to_string(), Value::Bool(metadata.is_dir()));
     info.insert("size".to_string(), Value::Number(metadata.len().into()));
-    
+
     if let Ok(modified) = metadata.modified() {
         if let Ok(duration) = modified.duration_since(std::time::UNIX_EPOCH) {
-            info.insert("modified".to_string(), Value::Number(duration.as_secs().into()));
+            info.insert(
+                "modified".to_string(),
+                Value::Number(duration.as_secs().into()),
+            );
         }
     }
-    
+
     Ok(info)
 }
 
@@ -250,47 +249,54 @@ pub async fn get_file_info(path: String) -> Result<HashMap<String, Value>, Strin
 pub async fn list_directory(path: String) -> Result<Vec<HashMap<String, Value>>, String> {
     use std::fs;
     use std::path::Path;
-    
+
     let path = Path::new(&path);
     let entries = fs::read_dir(path).map_err(|e| e.to_string())?;
-    
+
     let mut items = Vec::new();
-    
+
     for entry in entries {
         let entry = entry.map_err(|e| e.to_string())?;
         let path = entry.path();
         let metadata = entry.metadata().map_err(|e| e.to_string())?;
-        
+
         let mut item = HashMap::new();
-        item.insert("name".to_string(), Value::String(
-            path.file_name()
-                .and_then(|s| s.to_str())
-                .unwrap_or("")
-                .to_string()
-        ));
-        item.insert("path".to_string(), Value::String(
-            path.to_string_lossy().to_string()
-        ));
+        item.insert(
+            "name".to_string(),
+            Value::String(
+                path.file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("")
+                    .to_string(),
+            ),
+        );
+        item.insert(
+            "path".to_string(),
+            Value::String(path.to_string_lossy().to_string()),
+        );
         item.insert("is_file".to_string(), Value::Bool(metadata.is_file()));
         item.insert("is_dir".to_string(), Value::Bool(metadata.is_dir()));
         item.insert("size".to_string(), Value::Number(metadata.len().into()));
-        
+
         if let Ok(modified) = metadata.modified() {
             if let Ok(duration) = modified.duration_since(std::time::UNIX_EPOCH) {
-                item.insert("modified".to_string(), Value::Number(duration.as_secs().into()));
+                item.insert(
+                    "modified".to_string(),
+                    Value::Number(duration.as_secs().into()),
+                );
             }
         }
-        
+
         items.push(item);
     }
-    
+
     // 按名称排序
     items.sort_by(|a, b| {
         let name_a = a.get("name").and_then(|v| v.as_str()).unwrap_or("");
         let name_b = b.get("name").and_then(|v| v.as_str()).unwrap_or("");
         name_a.cmp(name_b)
     });
-    
+
     Ok(items)
 }
 
@@ -336,33 +342,21 @@ pub async fn create_book(
 }
 
 /// 列出所有书籍
-pub async fn list_books(
-    state: State<'_, AppState>,
-) -> Result<Vec<BookConfig>, String> {
+pub async fn list_books(state: State<'_, AppState>) -> Result<Vec<BookConfig>, String> {
     let file_manager = state.file_manager.lock().map_err(|e| e.to_string())?;
 
-    file_manager
-        .list_books()
-        .map_err(|e| e.to_string())
+    file_manager.list_books().map_err(|e| e.to_string())
 }
 
 /// 加载书籍
-pub async fn load_book(
-    state: State<'_, AppState>,
-    book_id: String,
-) -> Result<BookData, String> {
+pub async fn load_book(state: State<'_, AppState>, book_id: String) -> Result<BookData, String> {
     let file_manager = state.file_manager.lock().map_err(|e| e.to_string())?;
 
-    file_manager
-        .load_book(&book_id)
-        .map_err(|e| e.to_string())
+    file_manager.load_book(&book_id).map_err(|e| e.to_string())
 }
 
 /// 保存书籍
-pub async fn save_book(
-    state: State<'_, AppState>,
-    book_data: BookData,
-) -> Result<(), String> {
+pub async fn save_book(state: State<'_, AppState>, book_data: BookData) -> Result<(), String> {
     let file_manager = state.file_manager.lock().map_err(|e| e.to_string())?;
 
     file_manager
@@ -371,10 +365,7 @@ pub async fn save_book(
 }
 
 /// 删除书籍
-pub async fn delete_book(
-    state: State<'_, AppState>,
-    book_id: String,
-) -> Result<(), String> {
+pub async fn delete_book(state: State<'_, AppState>, book_id: String) -> Result<(), String> {
     let file_manager = state.file_manager.lock().map_err(|e| e.to_string())?;
 
     file_manager

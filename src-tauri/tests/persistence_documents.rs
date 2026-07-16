@@ -57,7 +57,7 @@ async fn documents_have_stable_sort_order_and_survive_reopen() {
         .create_document(document_input(&book_id, "Tie B", 2))
         .await
         .unwrap();
-    let mut expected_tied_ids = vec![tied_a.id.clone(), tied_b.id.clone()];
+    let mut expected_tied_ids = [tied_a.id.clone(), tied_b.id.clone()];
     expected_tied_ids.sort();
 
     let documents = worker.list_documents(book_id.clone()).await.unwrap();

@@ -17,10 +17,9 @@ fn e2e_override_uses_an_isolated_identifier_and_documents_artifact_locations() {
     assert!(guide_path.is_file(), "missing {}", guide_path.display());
     assert!(script_path.is_file(), "missing {}", script_path.display());
 
-    let base: serde_json::Value = serde_json::from_str(
-        &std::fs::read_to_string(manifest.join("tauri.conf.json")).unwrap(),
-    )
-    .unwrap();
+    let base: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(manifest.join("tauri.conf.json")).unwrap())
+            .unwrap();
     let override_config: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(config_path).unwrap()).unwrap();
     assert_eq!(base["identifier"], "com.branchwrite.app");
@@ -52,7 +51,10 @@ fn e2e_override_uses_an_isolated_identifier_and_documents_artifact_locations() {
         "com.branchwrite.e2e",
         "BranchWrite E2E",
     ] {
-        assert!(script.contains(required), "build verifier misses {required}");
+        assert!(
+            script.contains(required),
+            "build verifier misses {required}"
+        );
     }
     assert!(!guide.contains("tauri build -- --debug"));
     assert!(!script.contains("tauri build -- --debug"));

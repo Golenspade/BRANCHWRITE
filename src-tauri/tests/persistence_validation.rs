@@ -76,15 +76,9 @@ async fn nul_tags_are_validation_errors() {
 async fn invalid_document_inputs_are_validation_errors_without_mutation() {
     let (_temp, worker, book_id) = worker_and_book().await;
     for invalid in [
-        {
-            document_input(&book_id, " ", 0)
-        },
-        {
-            document_input(&book_id, "bad\0title", 0)
-        },
-        {
-            document_input(&book_id, "Chapter", -1)
-        },
+        { document_input(&book_id, " ", 0) },
+        { document_input(&book_id, "bad\0title", 0) },
+        { document_input(&book_id, "Chapter", -1) },
         {
             let mut input = document_input(&book_id, "Chapter", 0);
             input.document_type = "appendix".into();

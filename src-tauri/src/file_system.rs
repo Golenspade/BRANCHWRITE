@@ -24,7 +24,7 @@ pub struct ProjectConfig {
 /// 项目设置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectSettings {
-    pub auto_save_interval: u32, // 分钟
+    pub auto_save_interval: u32,    // 分钟
     pub auto_commit_threshold: u32, // 字数
     pub backup_enabled: bool,
     pub backup_interval: u32, // 小时
@@ -44,7 +44,8 @@ impl Default for ProjectSettings {
             editor_theme: "focus-writing".to_string(),
             font_size: 14,
             line_height: 24,
-            font_family: "'JetBrains Mono', 'Fira Code', 'Monaco', 'Consolas', monospace".to_string(),
+            font_family: "'JetBrains Mono', 'Fira Code', 'Monaco', 'Consolas', monospace"
+                .to_string(),
         }
     }
 }
@@ -114,7 +115,8 @@ impl Default for BookSettings {
             editor_theme: "focus-writing".to_string(),
             font_size: 14,
             line_height: 24,
-            font_family: "'JetBrains Mono', 'Fira Code', 'Monaco', 'Consolas', monospace".to_string(),
+            font_family: "'JetBrains Mono', 'Fira Code', 'Monaco', 'Consolas', monospace"
+                .to_string(),
         }
     }
 }
@@ -166,31 +168,36 @@ impl FileSystemManager {
 
         // 确保项目目录存在
         if !projects_dir.exists() {
-            fs::create_dir_all(&projects_dir)
-                .context("Failed to create projects directory")?;
+            fs::create_dir_all(&projects_dir).context("Failed to create projects directory")?;
         }
 
-        Ok(Self { projects_dir, books_dir })
+        Ok(Self {
+            projects_dir,
+            books_dir,
+        })
     }
 
     /// 获取项目存储目录
     fn get_projects_directory() -> Result<PathBuf> {
-        let home_dir = dirs::home_dir()
-            .context("Failed to get home directory")?;
+        let home_dir = dirs::home_dir().context("Failed to get home directory")?;
 
         Ok(home_dir.join(".branchwrite").join("projects"))
     }
 
     /// 获取书籍存储目录
     fn get_books_directory() -> Result<PathBuf> {
-        let home_dir = dirs::home_dir()
-            .context("Failed to get home directory")?;
+        let home_dir = dirs::home_dir().context("Failed to get home directory")?;
 
         Ok(home_dir.join(".branchwrite").join("books"))
     }
 
     /// 创建新项目
-    pub fn create_project(&self, name: &str, description: &str, author: &str) -> Result<ProjectData> {
+    pub fn create_project(
+        &self,
+        name: &str,
+        description: &str,
+        author: &str,
+    ) -> Result<ProjectData> {
         let project_id = Uuid::new_v4().to_string();
         let now = Utc::now();
 
@@ -226,8 +233,7 @@ impl FileSystemManager {
 
         // 创建项目目录
         let project_dir = self.projects_dir.join(&project_id);
-        fs::create_dir_all(&project_dir)
-            .context("Failed to create project directory")?;
+        fs::create_dir_all(&project_dir).context("Failed to create project directory")?;
 
         // 保存项目数据
         self.save_project(&project_data)?;
@@ -238,7 +244,13 @@ impl FileSystemManager {
     // ===== 书籍管理方法 =====
 
     /// 创建新书籍
-    pub fn create_book(&self, name: &str, description: &str, author: &str, genre: &str) -> Result<BookData> {
+    pub fn create_book(
+        &self,
+        name: &str,
+        description: &str,
+        author: &str,
+        genre: &str,
+    ) -> Result<BookData> {
         let book_id = Uuid::new_v4().to_string();
         let now = Utc::now();
 
@@ -263,13 +275,11 @@ impl FileSystemManager {
 
         // 创建书籍目录
         let book_dir = self.books_dir.join(&book_id);
-        fs::create_dir_all(&book_dir)
-            .context("Failed to create book directory")?;
+        fs::create_dir_all(&book_dir).context("Failed to create book directory")?;
 
         // 创建文档目录
         let documents_dir = book_dir.join("documents");
-        fs::create_dir_all(&documents_dir)
-            .context("Failed to create documents directory")?;
+        fs::create_dir_all(&documents_dir).context("Failed to create documents directory")?;
 
         // 保存书籍数据
         self.save_book(&book_data)?;
@@ -285,15 +295,13 @@ impl FileSystemManager {
         let config_path = book_dir.join("config.json");
         let config_json = serde_json::to_string_pretty(&book_data.config)
             .context("Failed to serialize book config")?;
-        fs::write(&config_path, config_json)
-            .context("Failed to write book config")?;
+        fs::write(&config_path, config_json).context("Failed to write book config")?;
 
         // 保存文档列表
         let documents_path = book_dir.join("documents.json");
         let documents_json = serde_json::to_string_pretty(&book_data.documents)
             .context("Failed to serialize documents list")?;
-        fs::write(&documents_path, documents_json)
-            .context("Failed to write documents list")?;
+        fs::write(&documents_path, documents_json).context("Failed to write documents list")?;
 
         // 保存当前文档ID
         if let Some(current_doc_id) = &book_data.current_document_id {
@@ -315,18 +323,16 @@ impl FileSystemManager {
 
         // 加载书籍配置
         let config_path = book_dir.join("config.json");
-        let config_json = fs::read_to_string(&config_path)
-            .context("Failed to read book config")?;
-        let config: BookConfig = serde_json::from_str(&config_json)
-            .context("Failed to parse book config")?;
+        let config_json = fs::read_to_string(&config_path).context("Failed to read book config")?;
+        let config: BookConfig =
+            serde_json::from_str(&config_json).context("Failed to parse book config")?;
 
         // 加载文档列表
         let documents_path = book_dir.join("documents.json");
         let documents = if documents_path.exists() {
-            let documents_json = fs::read_to_string(&documents_path)
-                .context("Failed to read documents list")?;
-            serde_json::from_str(&documents_json)
-                .context("Failed to parse documents list")?
+            let documents_json =
+                fs::read_to_string(&documents_path).context("Failed to read documents list")?;
+            serde_json::from_str(&documents_json).context("Failed to parse documents list")?
         } else {
             vec![]
         };
@@ -334,8 +340,10 @@ impl FileSystemManager {
         // 加载当前文档ID
         let current_doc_path = book_dir.join("current_document.txt");
         let current_document_id = if current_doc_path.exists() {
-            Some(fs::read_to_string(&current_doc_path)
-                .context("Failed to read current document ID")?)
+            Some(
+                fs::read_to_string(&current_doc_path)
+                    .context("Failed to read current document ID")?,
+            )
         } else {
             None
         };
@@ -355,8 +363,7 @@ impl FileSystemManager {
             return Ok(books);
         }
 
-        let entries = fs::read_dir(&self.books_dir)
-            .context("Failed to read books directory")?;
+        let entries = fs::read_dir(&self.books_dir).context("Failed to read books directory")?;
 
         for entry in entries {
             let entry = entry.context("Failed to read directory entry")?;
@@ -366,12 +373,10 @@ impl FileSystemManager {
                 let config_path = path.join("config.json");
                 if config_path.exists() {
                     match fs::read_to_string(&config_path) {
-                        Ok(config_json) => {
-                            match serde_json::from_str::<BookConfig>(&config_json) {
-                                Ok(config) => books.push(config),
-                                Err(e) => eprintln!("Failed to parse book config: {}", e),
-                            }
-                        }
+                        Ok(config_json) => match serde_json::from_str::<BookConfig>(&config_json) {
+                            Ok(config) => books.push(config),
+                            Err(e) => eprintln!("Failed to parse book config: {}", e),
+                        },
                         Err(e) => eprintln!("Failed to read book config: {}", e),
                     }
                 }
@@ -379,7 +384,7 @@ impl FileSystemManager {
         }
 
         // 按最后修改时间排序
-        books.sort_by(|a, b| b.last_modified.cmp(&a.last_modified));
+        books.sort_by_key(|book| std::cmp::Reverse(book.last_modified));
 
         Ok(books)
     }
@@ -389,8 +394,7 @@ impl FileSystemManager {
         let book_dir = self.books_dir.join(book_id);
 
         if book_dir.exists() {
-            fs::remove_dir_all(&book_dir)
-                .context("Failed to delete book directory")?;
+            fs::remove_dir_all(&book_dir).context("Failed to delete book directory")?;
         }
 
         Ok(())
@@ -399,7 +403,12 @@ impl FileSystemManager {
     // ===== 文档管理方法 =====
 
     /// 创建新文档
-    pub fn create_document(&self, book_id: &str, title: &str, doc_type: &str) -> Result<DocumentConfig> {
+    pub fn create_document(
+        &self,
+        book_id: &str,
+        title: &str,
+        doc_type: &str,
+    ) -> Result<DocumentConfig> {
         let document_id = Uuid::new_v4().to_string();
         let now = Utc::now();
 
@@ -421,26 +430,26 @@ impl FileSystemManager {
         };
 
         // 创建文档目录
-        let doc_dir = self.books_dir.join(book_id).join("documents").join(&document_id);
-        fs::create_dir_all(&doc_dir)
-            .context("Failed to create document directory")?;
+        let doc_dir = self
+            .books_dir
+            .join(book_id)
+            .join("documents")
+            .join(&document_id);
+        fs::create_dir_all(&doc_dir).context("Failed to create document directory")?;
 
         // 创建空的文档内容文件
         let content_path = doc_dir.join("content.md");
-        fs::write(&content_path, "")
-            .context("Failed to create document content file")?;
+        fs::write(&content_path, "").context("Failed to create document content file")?;
 
         // 保存文档元数据
         let metadata_path = doc_dir.join("metadata.json");
         let metadata_json = serde_json::to_string_pretty(&document_config)
             .context("Failed to serialize document metadata")?;
-        fs::write(&metadata_path, metadata_json)
-            .context("Failed to write document metadata")?;
+        fs::write(&metadata_path, metadata_json).context("Failed to write document metadata")?;
 
         // 创建提交目录
         let commits_dir = doc_dir.join("commits");
-        fs::create_dir_all(&commits_dir)
-            .context("Failed to create commits directory")?;
+        fs::create_dir_all(&commits_dir).context("Failed to create commits directory")?;
 
         // 更新书籍的文档列表
         book_data.documents.push(document_config.clone());
@@ -451,7 +460,8 @@ impl FileSystemManager {
 
     /// 加载文档内容
     pub fn load_document(&self, book_id: &str, document_id: &str) -> Result<String> {
-        let content_path = self.books_dir
+        let content_path = self
+            .books_dir
             .join(book_id)
             .join("documents")
             .join(document_id)
@@ -461,26 +471,25 @@ impl FileSystemManager {
             return Ok(String::new());
         }
 
-        fs::read_to_string(&content_path)
-            .context("Failed to read document content")
+        fs::read_to_string(&content_path).context("Failed to read document content")
     }
 
     /// 保存文档内容
     pub fn save_document(&self, book_id: &str, document_id: &str, content: &str) -> Result<()> {
-        let doc_dir = self.books_dir
+        let doc_dir = self
+            .books_dir
             .join(book_id)
             .join("documents")
             .join(document_id);
 
         let content_path = doc_dir.join("content.md");
-        fs::write(&content_path, content)
-            .context("Failed to write document content")?;
+        fs::write(&content_path, content).context("Failed to write document content")?;
 
         // 更新文档元数据
         let metadata_path = doc_dir.join("metadata.json");
         if metadata_path.exists() {
-            let metadata_json = fs::read_to_string(&metadata_path)
-                .context("Failed to read document metadata")?;
+            let metadata_json =
+                fs::read_to_string(&metadata_path).context("Failed to read document metadata")?;
             let mut document_config: DocumentConfig = serde_json::from_str(&metadata_json)
                 .context("Failed to parse document metadata")?;
 
@@ -511,14 +520,14 @@ impl FileSystemManager {
     /// 删除文档
     pub fn delete_document(&self, book_id: &str, document_id: &str) -> Result<()> {
         // 删除文档目录
-        let doc_dir = self.books_dir
+        let doc_dir = self
+            .books_dir
             .join(book_id)
             .join("documents")
             .join(document_id);
 
         if doc_dir.exists() {
-            fs::remove_dir_all(&doc_dir)
-                .context("Failed to delete document directory")?;
+            fs::remove_dir_all(&doc_dir).context("Failed to delete document directory")?;
         }
 
         // 从书籍的文档列表中移除
@@ -538,13 +547,12 @@ impl FileSystemManager {
     /// 保存项目数据
     pub fn save_project(&self, project_data: &ProjectData) -> Result<()> {
         let project_dir = self.projects_dir.join(&project_data.config.id);
-        
+
         // 保存项目配置
         let config_path = project_dir.join("config.json");
         let config_json = serde_json::to_string_pretty(&project_data.config)
             .context("Failed to serialize project config")?;
-        fs::write(&config_path, config_json)
-            .context("Failed to write project config")?;
+        fs::write(&config_path, config_json).context("Failed to write project config")?;
 
         // 保存文档内容
         let content_path = project_dir.join("document.md");
@@ -555,27 +563,23 @@ impl FileSystemManager {
         let metadata_path = project_dir.join("metadata.json");
         let metadata_json = serde_json::to_string_pretty(&project_data.document_metadata)
             .context("Failed to serialize document metadata")?;
-        fs::write(&metadata_path, metadata_json)
-            .context("Failed to write document metadata")?;
+        fs::write(&metadata_path, metadata_json).context("Failed to write document metadata")?;
 
         // 保存提交历史
         let commits_path = project_dir.join("commits.json");
         let commits_json = serde_json::to_string_pretty(&project_data.commits)
             .context("Failed to serialize commits")?;
-        fs::write(&commits_path, commits_json)
-            .context("Failed to write commits")?;
+        fs::write(&commits_path, commits_json).context("Failed to write commits")?;
 
         // 保存提交数据
         let commits_dir = project_dir.join("commit_data");
         if !commits_dir.exists() {
-            fs::create_dir_all(&commits_dir)
-                .context("Failed to create commit data directory")?;
+            fs::create_dir_all(&commits_dir).context("Failed to create commit data directory")?;
         }
 
         for (commit_id, content) in &project_data.commit_data {
             let commit_file = commits_dir.join(format!("{}.md", commit_id));
-            fs::write(&commit_file, content)
-                .context("Failed to write commit data")?;
+            fs::write(&commit_file, content).context("Failed to write commit data")?;
         }
 
         Ok(())
@@ -584,37 +588,35 @@ impl FileSystemManager {
     /// 加载项目数据
     pub fn load_project(&self, project_id: &str) -> Result<ProjectData> {
         let project_dir = self.projects_dir.join(project_id);
-        
+
         if !project_dir.exists() {
             return Err(anyhow::anyhow!("Project not found: {}", project_id));
         }
 
         // 加载项目配置
         let config_path = project_dir.join("config.json");
-        let config_json = fs::read_to_string(&config_path)
-            .context("Failed to read project config")?;
-        let config: ProjectConfig = serde_json::from_str(&config_json)
-            .context("Failed to parse project config")?;
+        let config_json =
+            fs::read_to_string(&config_path).context("Failed to read project config")?;
+        let config: ProjectConfig =
+            serde_json::from_str(&config_json).context("Failed to parse project config")?;
 
         // 加载文档内容
         let content_path = project_dir.join("document.md");
-        let document_content = fs::read_to_string(&content_path)
-            .unwrap_or_default();
+        let document_content = fs::read_to_string(&content_path).unwrap_or_default();
 
         // 加载文档元数据
         let metadata_path = project_dir.join("metadata.json");
-        let metadata_json = fs::read_to_string(&metadata_path)
-            .context("Failed to read document metadata")?;
-        let document_metadata: DocumentMetadata = serde_json::from_str(&metadata_json)
-            .context("Failed to parse document metadata")?;
+        let metadata_json =
+            fs::read_to_string(&metadata_path).context("Failed to read document metadata")?;
+        let document_metadata: DocumentMetadata =
+            serde_json::from_str(&metadata_json).context("Failed to parse document metadata")?;
 
         // 加载提交历史
         let commits_path = project_dir.join("commits.json");
         let commits = if commits_path.exists() {
-            let commits_json = fs::read_to_string(&commits_path)
-                .context("Failed to read commits")?;
-            serde_json::from_str(&commits_json)
-                .context("Failed to parse commits")?
+            let commits_json =
+                fs::read_to_string(&commits_path).context("Failed to read commits")?;
+            serde_json::from_str(&commits_json).context("Failed to parse commits")?
         } else {
             vec![]
         };
@@ -622,21 +624,21 @@ impl FileSystemManager {
         // 加载提交数据
         let commits_dir = project_dir.join("commit_data");
         let mut commit_data = HashMap::new();
-        
+
         if commits_dir.exists() {
             for entry in fs::read_dir(&commits_dir)? {
                 let entry = entry?;
                 let path = entry.path();
-                
+
                 if path.extension().and_then(|s| s.to_str()) == Some("md") {
-                    let commit_id = path.file_stem()
+                    let commit_id = path
+                        .file_stem()
                         .and_then(|s| s.to_str())
                         .unwrap_or_default()
                         .to_string();
-                    
-                    let content = fs::read_to_string(&path)
-                        .unwrap_or_default();
-                    
+
+                    let content = fs::read_to_string(&path).unwrap_or_default();
+
                     commit_data.insert(commit_id, content);
                 }
             }
@@ -662,13 +664,14 @@ impl FileSystemManager {
         for entry in fs::read_dir(&self.projects_dir)? {
             let entry = entry?;
             let path = entry.path();
-            
+
             if path.is_dir() {
                 let config_path = path.join("config.json");
                 if config_path.exists() {
                     match fs::read_to_string(&config_path) {
                         Ok(config_json) => {
-                            if let Ok(config) = serde_json::from_str::<ProjectConfig>(&config_json) {
+                            if let Ok(config) = serde_json::from_str::<ProjectConfig>(&config_json)
+                            {
                                 projects.push(config);
                             }
                         }
@@ -679,7 +682,7 @@ impl FileSystemManager {
         }
 
         // 按最后修改时间排序
-        projects.sort_by(|a, b| b.last_modified.cmp(&a.last_modified));
+        projects.sort_by_key(|project| std::cmp::Reverse(project.last_modified));
 
         Ok(projects)
     }
@@ -687,10 +690,9 @@ impl FileSystemManager {
     /// 删除项目
     pub fn delete_project(&self, project_id: &str) -> Result<()> {
         let project_dir = self.projects_dir.join(project_id);
-        
+
         if project_dir.exists() {
-            fs::remove_dir_all(&project_dir)
-                .context("Failed to delete project directory")?;
+            fs::remove_dir_all(&project_dir).context("Failed to delete project directory")?;
         }
 
         Ok(())
@@ -699,10 +701,9 @@ impl FileSystemManager {
     /// 导出项目
     pub fn export_project(&self, project_id: &str, export_path: &Path) -> Result<()> {
         let project_data = self.load_project(project_id)?;
-        
+
         // 创建导出目录
-        fs::create_dir_all(export_path)
-            .context("Failed to create export directory")?;
+        fs::create_dir_all(export_path).context("Failed to create export directory")?;
 
         // 导出主文档
         let main_doc_path = export_path.join("document.md");
@@ -716,18 +717,19 @@ impl FileSystemManager {
             project_data.config.description,
             project_data.config.author,
             project_data.config.created_at.format("%Y-%m-%d %H:%M:%S"),
-            project_data.config.last_modified.format("%Y-%m-%d %H:%M:%S")
+            project_data
+                .config
+                .last_modified
+                .format("%Y-%m-%d %H:%M:%S")
         );
-        
+
         let info_path = export_path.join("project_info.md");
-        fs::write(&info_path, project_info)
-            .context("Failed to export project info")?;
+        fs::write(&info_path, project_info).context("Failed to export project info")?;
 
         // 导出版本历史
         if !project_data.commits.is_empty() {
             let history_dir = export_path.join("version_history");
-            fs::create_dir_all(&history_dir)
-                .context("Failed to create history directory")?;
+            fs::create_dir_all(&history_dir).context("Failed to create history directory")?;
 
             for commit in &project_data.commits {
                 if let Some(content) = project_data.commit_data.get(&commit.id) {
@@ -736,12 +738,15 @@ impl FileSystemManager {
                         "# 版本: {}\n\n**时间**: {}\n**类型**: {}\n**字数**: {}\n\n---\n\n{}",
                         commit.message,
                         commit.timestamp.format("%Y-%m-%d %H:%M:%S"),
-                        if commit.is_auto_commit { "自动保存" } else { "手动保存" },
+                        if commit.is_auto_commit {
+                            "自动保存"
+                        } else {
+                            "手动保存"
+                        },
                         commit.word_count,
                         content
                     );
-                    fs::write(&commit_file, commit_content)
-                        .context("Failed to export commit")?;
+                    fs::write(&commit_file, commit_content).context("Failed to export commit")?;
                 }
             }
         }
@@ -750,26 +755,51 @@ impl FileSystemManager {
     }
 
     /// 获取项目统计信息
-    pub fn get_project_stats(&self, project_id: &str) -> Result<HashMap<String, serde_json::Value>> {
+    pub fn get_project_stats(
+        &self,
+        project_id: &str,
+    ) -> Result<HashMap<String, serde_json::Value>> {
         let project_data = self.load_project(project_id)?;
         let mut stats = HashMap::new();
 
-        stats.insert("total_commits".to_string(), serde_json::Value::Number(project_data.commits.len().into()));
-        stats.insert("auto_commits".to_string(), serde_json::Value::Number(
-            project_data.commits.iter().filter(|c| c.is_auto_commit).count().into()
-        ));
-        stats.insert("manual_commits".to_string(), serde_json::Value::Number(
-            project_data.commits.iter().filter(|c| !c.is_auto_commit).count().into()
-        ));
-        stats.insert("current_word_count".to_string(), serde_json::Value::Number(
-            project_data.document_metadata.word_count.into()
-        ));
-        stats.insert("current_character_count".to_string(), serde_json::Value::Number(
-            project_data.document_metadata.character_count.into()
-        ));
-        stats.insert("current_line_count".to_string(), serde_json::Value::Number(
-            project_data.document_metadata.line_count.into()
-        ));
+        stats.insert(
+            "total_commits".to_string(),
+            serde_json::Value::Number(project_data.commits.len().into()),
+        );
+        stats.insert(
+            "auto_commits".to_string(),
+            serde_json::Value::Number(
+                project_data
+                    .commits
+                    .iter()
+                    .filter(|c| c.is_auto_commit)
+                    .count()
+                    .into(),
+            ),
+        );
+        stats.insert(
+            "manual_commits".to_string(),
+            serde_json::Value::Number(
+                project_data
+                    .commits
+                    .iter()
+                    .filter(|c| !c.is_auto_commit)
+                    .count()
+                    .into(),
+            ),
+        );
+        stats.insert(
+            "current_word_count".to_string(),
+            serde_json::Value::Number(project_data.document_metadata.word_count.into()),
+        );
+        stats.insert(
+            "current_character_count".to_string(),
+            serde_json::Value::Number(project_data.document_metadata.character_count.into()),
+        );
+        stats.insert(
+            "current_line_count".to_string(),
+            serde_json::Value::Number(project_data.document_metadata.line_count.into()),
+        );
 
         Ok(stats)
     }
