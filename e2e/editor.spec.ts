@@ -51,6 +51,14 @@ async function typeInMonaco(page: Page, text: string) {
   await page.keyboard.type(text, { delay: 15 })
 }
 
+async function saveVersion(page: Page, description: string) {
+  await page.getByTestId('save-version').click()
+  await expect(page.getByTestId('create-version-dialog')).toBeVisible()
+  await fillNaiveInput(page, 'create-version-description', description)
+  await page.getByTestId('create-version-submit').click()
+  await expect(page.getByTestId('create-version-dialog')).toBeHidden()
+}
+
 test.describe('编辑器 WebView E2E', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
@@ -130,11 +138,7 @@ test.describe('编辑器 WebView E2E', () => {
 
     await typeInWysiwyg(page, '第一版内容')
 
-    page.once('dialog', async (dialog) => {
-      expect(dialog.type()).toBe('prompt')
-      await dialog.accept('初始版本')
-    })
-    await page.getByTestId('save-version').click()
+    await saveVersion(page, '初始版本')
 
     await expect(page.getByRole('listitem').getByText('初始版本')).toBeVisible()
 
@@ -153,8 +157,7 @@ test.describe('编辑器 WebView E2E', () => {
     await expect(page.getByTestId('persistence-demo-banner')).toBeVisible()
     await typeInWysiwyg(page, '可恢复的第一版')
 
-    page.once('dialog', async (dialog) => dialog.accept('恢复目标'))
-    await page.getByTestId('save-version').click()
+    await saveVersion(page, '恢复目标')
     await expect(page.getByText('恢复目标', { exact: true })).toBeVisible()
 
     await page.getByTestId('version-view-btn').first().click()
@@ -166,8 +169,10 @@ test.describe('编辑器 WebView E2E', () => {
     await expect(page.getByTestId('editor-diff-pane')).toBeVisible()
     await expect(page.getByTestId('diff-compare-label')).toHaveText('恢复目标')
 
-    page.once('dialog', async (dialog) => dialog.accept())
     await page.getByTestId('version-restore-btn').first().click()
+    await expect(page.getByTestId('restore-version-dialog')).toBeVisible()
+    await page.getByTestId('restore-version-confirm').click()
+    await expect(page.getByTestId('restore-version-dialog')).toBeHidden()
     await expect.poll(async () => page.evaluate(() => {
       const api = (window as unknown as { __branchwriteVditor?: { getValue: () => string } }).__branchwriteVditor
       return api?.getValue() ?? ''
