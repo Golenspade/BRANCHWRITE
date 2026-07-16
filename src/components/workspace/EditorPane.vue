@@ -33,7 +33,7 @@
             type="primary"
             :disabled="!hasDocument"
             data-testid="save-version"
-            @click="saveVersion"
+            @click="openCreateVersionDialog"
           >
             保存版本
           </n-button>
@@ -103,6 +103,12 @@
       </footer>
     </div>
   </n-card>
+
+  <CreateVersionDialog
+    v-model:show="showCreateVersionDialog"
+    default-message="手动保存"
+    :submit="createVersion"
+  />
 </template>
 
 <script setup lang="ts">
@@ -114,6 +120,7 @@ import { useMessage } from 'naive-ui'
 import { useAppStore } from '../../stores/app'
 import { allEditorThemes } from '../../utils/editorThemes'
 import { computeTextStats } from '../../utils/textStats'
+import CreateVersionDialog from './CreateVersionDialog.vue'
 import DiffPane from './DiffPane.vue'
 import MonacoSourcePane from './MonacoSourcePane.vue'
 import WysiwygPane from './WysiwygPane.vue'
@@ -131,6 +138,7 @@ const cursor = ref({ line: 1, column: 1 })
 const wysiwygMounted = ref(false)
 const documentDraft = ref('')
 const monacoRef = ref<{ undo: () => void; redo: () => void } | null>(null)
+const showCreateVersionDialog = ref(false)
 
 const hasDocument = computed(() => !!currentDocumentDetail.value)
 const stats = computed(() => computeTextStats(documentDraft.value || currentDocument.value || ''))
@@ -193,6 +201,9 @@ function onWysiwygReady() { documentDraft.value = currentDocument.value || '' }
 function onCursor(value: { line: number; column: number }) { cursor.value = value }
 
 function handleGlobalShortcuts(event: KeyboardEvent) {
+  if (event.defaultPrevented) return
+  const eventTarget = event.target
+  if (eventTarget instanceof Element && eventTarget.closest('[role="dialog"]')) return
   const isMod = event.ctrlKey || event.metaKey
   if (!isMod || event.shiftKey || event.altKey) return
   const modes: Partial<Record<string, EditorMode>> = {
@@ -205,19 +216,22 @@ function handleGlobalShortcuts(event: KeyboardEvent) {
     else message.warning('请先保存一个版本后再对比')
   } else if (event.code === 'KeyS' && (mode.value === 'wysiwyg' || mode.value === 'source')) {
     event.preventDefault()
-    void saveVersion()
+    openCreateVersionDialog()
   }
 }
 
-async function saveVersion() {
+function openCreateVersionDialog() {
   if (!hasDocument.value) return
-  const value = window.prompt('请输入版本描述：', '手动保存')
-  if (!value?.trim()) return
+  showCreateVersionDialog.value = true
+}
+
+async function createVersion(description: string, operationId: string) {
   try {
-    await app.createVersion(value.trim())
+    await app.createVersion(description, operationId)
     message.success('版本已保存')
-  } catch {
+  } catch (error) {
     message.error('保存版本失败')
+    throw error
   }
 }
 </script>

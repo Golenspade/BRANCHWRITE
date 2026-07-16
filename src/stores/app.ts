@@ -332,7 +332,7 @@ export const useAppStore = defineStore('app', () => {
     return detail ? { id: versionId, content: detail.content } : null
   }
 
-  async function createVersion(message: string) {
+  async function createVersion(message: string, operationId: string = crypto.randomUUID()) {
     await flushDocumentSave()
     const detail = currentDocumentDetail.value
     if (!detail) throw new Error('No document selected')
@@ -340,7 +340,7 @@ export const useAppStore = defineStore('app', () => {
     error.value = null
     try {
       const created = await requireGateway().createVersion({
-        operationId: crypto.randomUUID(), documentId: detail.id,
+        operationId, documentId: detail.id,
         content: currentDocument.value, message, expectedRevision: detail.revision,
       })
       await reloadCurrentDocument(detail.id, generation)
@@ -348,7 +348,10 @@ export const useAppStore = defineStore('app', () => {
     } catch (failure) { error.value = errorMessage(failure); throw failure }
   }
 
-  async function restoreVersion(versionId: string): Promise<RestoreVersionResult> {
+  async function restoreVersion(
+    versionId: string,
+    operationId: string = crypto.randomUUID(),
+  ): Promise<RestoreVersionResult> {
     await flushDocumentSave()
     const detail = currentDocumentDetail.value
     if (!detail) throw new Error('No document selected')
@@ -357,7 +360,7 @@ export const useAppStore = defineStore('app', () => {
     info.value = null
     try {
       const result = await requireGateway().restoreVersion({
-        operationId: crypto.randomUUID(), documentId: detail.id,
+        operationId, documentId: detail.id,
         targetVersionId: versionId, expectedRevision: detail.revision,
       })
       if (result.alreadyCurrent) info.value = '已经是此版本'

@@ -14,6 +14,7 @@ export default tseslint.config([
       'dist',
       'playwright-report',
       'test-results',
+      'src-tauri/target',
       'src/components/workspace/VersionPanel.vue.backup',
     ],
   },

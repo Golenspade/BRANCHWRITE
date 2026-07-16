@@ -48,6 +48,13 @@ describe('atomic version actions', () => {
     expect(store.error).toBe('create failed')
   })
 
+  it('uses a caller-provided operation ID for create retries', async () => {
+    const gateway = fakeGateway()
+    const store = await ready(gateway)
+    await store.createVersion('Manual', 'create-operation-fixed')
+    expect(gateway.createVersion.mock.calls[0][0].operationId).toBe('create-operation-fixed')
+  })
+
   it('reloads document and versions only after create succeeds', async () => {
     const gateway = fakeGateway()
     const store = await ready(gateway)
@@ -94,6 +101,13 @@ describe('atomic version actions', () => {
     expect(store.info).toBe('已经是此版本')
     expect(gateway.getDocument).not.toHaveBeenCalled()
     expect(gateway.listVersions).not.toHaveBeenCalled()
+  })
+
+  it('uses a caller-provided operation ID for restore retries', async () => {
+    const gateway = fakeGateway()
+    const store = await ready(gateway)
+    await store.restoreVersion('version-1', 'restore-operation-fixed')
+    expect(gateway.restoreVersion.mock.calls[0][0].operationId).toBe('restore-operation-fixed')
   })
 
   it('reloads document and versions after a successful restore', async () => {
