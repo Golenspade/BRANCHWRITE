@@ -21,4 +21,20 @@ describe('computeTextStats', () => {
     expect(stats.lines).toBe(3)
     expect(stats.paragraphs).toBe(2)
   })
+
+  it('counts Unicode scalar characters for persisted emoji content', () => {
+    expect(computeTextStats('v1 持久化正文 👋')).toEqual({
+      characters: 10,
+      charactersNoSpaces: 8,
+      words: 3,
+      lines: 1,
+      paragraphs: 1,
+    })
+  })
+
+  it('counts each astral emoji as one character with and without whitespace', () => {
+    const stats = computeTextStats('😀 \n🧪')
+    expect(stats.characters).toBe(4)
+    expect(stats.charactersNoSpaces).toBe(2)
+  })
 })

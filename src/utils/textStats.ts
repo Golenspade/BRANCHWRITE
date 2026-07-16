@@ -8,8 +8,8 @@ export interface TextStats {
 
 /** 统计文本字数、字符、行数等写作指标 */
 export function computeTextStats(text: string): TextStats {
-  const characters = text.length
-  const charactersNoSpaces = text.replace(/\s/g, '').length
+  const characters = [...text].length
+  const charactersNoSpaces = [...text.replace(/\s/g, '')].length
   const trimmed = text.trim()
   const words = trimmed
     ? trimmed.split(/\s+/).filter((w) => w.length > 0).length

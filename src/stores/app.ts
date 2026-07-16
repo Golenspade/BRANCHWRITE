@@ -176,6 +176,7 @@ export const useAppStore = defineStore('app', () => {
     versions.value = []
     versionDetails.value = {}
     selectedCommits.value = []
+    currentMode.value = 'wysiwyg'
   }
 
   async function switchDocument(documentId: string) {

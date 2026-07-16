@@ -85,4 +85,34 @@ describe('late document-scoped version detail', () => {
     expect(store.currentMode).toBe('wysiwyg')
     expect(store.error).toBeNull()
   })
+
+  it('leaves Diff mode immediately when switching away from the displayed document', async () => {
+    const { gateway, store } = await pendingVersionRequest()
+    gateway.getVersion.mockReset()
+    gateway.getVersion.mockResolvedValueOnce(sampleVersion('version-1', 'document-1'))
+    await store.selectVersionForDiff('version-1')
+    expect(store.currentMode).toBe('diff')
+    expect(store.selectedCommits).toEqual(['version-1'])
+    expect(store.versionDetails).toHaveProperty('version-1')
+
+    const documentB = deferred<ReturnType<typeof sampleDocument>>()
+    const versionsB = deferred<ReturnType<typeof versionSummary>[]>()
+    gateway.getDocument.mockImplementationOnce(() => documentB.promise)
+    gateway.listVersions.mockImplementationOnce(() => versionsB.promise)
+    const switching = store.switchDocument('document-2')
+    await vi.waitFor(() => expect(gateway.getDocument).toHaveBeenCalledWith('document-2'))
+
+    expect(store.currentMode).toBe('wysiwyg')
+    expect(store.selectedCommits).toEqual([])
+    expect(store.versionDetails).toEqual({})
+    expect(store.versions).toEqual([])
+
+    documentB.resolve(sampleDocument('document-2'))
+    versionsB.resolve([versionSummary(sampleVersion('version-2', 'document-2'))])
+    await switching
+    expect(store.currentMode).toBe('wysiwyg')
+    expect(store.selectedCommits).toEqual([])
+    expect(store.versionDetails).toEqual({})
+    expect(store.versions.map((version) => version.documentId)).toEqual(['document-2'])
+  })
 })
