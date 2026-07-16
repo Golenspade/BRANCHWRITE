@@ -41,7 +41,7 @@ pub fn active_builder() -> tauri::Builder<tauri::Wry> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-  active_builder()
+  let app = active_builder()
     .setup(|app| {
       let app_data_dir = app.path().app_data_dir()?;
       let persistence = PersistenceWorker::start(app_data_dir)
@@ -56,6 +56,13 @@ pub fn run() {
       }
       Ok(())
     })
-    .run(tauri::generate_context!())
-    .expect("error while running tauri application");
+    .build(tauri::generate_context!())
+    .expect("error while building tauri application");
+  app.run(|app_handle, event| {
+    if let tauri::RunEvent::Exit = event {
+      if let Err(error) = app_handle.state::<PersistenceWorker>().shutdown_blocking() {
+        log::error!("failed to shut down persistence worker: {}", error.message);
+      }
+    }
+  });
 }

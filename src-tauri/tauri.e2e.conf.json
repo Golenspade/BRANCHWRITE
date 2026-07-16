@@ -1,0 +1,5 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "BranchWrite E2E",
+  "identifier": "com.branchwrite.e2e"
+}

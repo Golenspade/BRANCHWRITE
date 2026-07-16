@@ -4,6 +4,7 @@ use app_lib::persistence::worker::{
     MINIMUM_SQLITE_VERSION, REQUEST_QUEUE_CAPACITY, WORKER_THREAD_NAME,
 };
 use rusqlite::Connection;
+use serde_json::json;
 use tempfile::TempDir;
 
 #[test]
@@ -60,6 +61,42 @@ async fn worker_reopens_an_existing_database_idempotently() {
         assert_eq!(worker.health().await.unwrap().user_version, 1);
         worker.shutdown().await.unwrap();
     }
+}
+
+#[test]
+fn blocking_shutdown_is_idempotent_joins_and_allows_immediate_exact_reopen() {
+    use app_lib::persistence::dto::CreateBookInput;
+
+    let temp = TempDir::new().unwrap();
+    let worker = PersistenceWorker::start(temp.path()).unwrap();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let book = runtime
+        .block_on(worker.create_book(CreateBookInput {
+            name: "Shutdown evidence".into(),
+            description: "exactly persisted".into(),
+            author: "Author".into(),
+            genre: "fiction".into(),
+            cover_image: None,
+            tags: vec!["shutdown".into()],
+            settings: json!({"fixture": true}),
+        }))
+        .unwrap();
+    drop(runtime);
+
+    worker.shutdown_blocking().unwrap();
+    worker.shutdown_blocking().unwrap();
+    drop(worker);
+
+    let reopened = PersistenceWorker::start(temp.path()).unwrap();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    assert_eq!(
+        runtime
+            .block_on(reopened.get_book(book.id.clone()))
+            .unwrap(),
+        book
+    );
+    drop(runtime);
+    reopened.shutdown_blocking().unwrap();
 }
 
 #[test]

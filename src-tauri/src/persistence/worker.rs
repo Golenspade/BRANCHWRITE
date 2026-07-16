@@ -3,6 +3,7 @@ use super::migrations;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
@@ -37,7 +38,7 @@ pub struct Health {
 
 pub struct PersistenceWorker {
     sender: Option<mpsc::Sender<Request>>,
-    join: Option<JoinHandle<()>>,
+    join: Mutex<Option<JoinHandle<()>>>,
 }
 
 impl PersistenceWorker {
@@ -54,7 +55,7 @@ impl PersistenceWorker {
         match startup_receiver.recv() {
             Ok(Ok(())) => Ok(Self {
                 sender: Some(sender),
-                join: Some(join),
+                join: Mutex::new(Some(join)),
             }),
             Ok(Err(error)) => {
                 let _ = join.join();
@@ -91,10 +92,31 @@ impl PersistenceWorker {
         };
         let join_result = self
             .join
+            .get_mut()
+            .map_err(|_| worker_unavailable())?
             .take()
             .ok_or_else(worker_unavailable)?
             .join()
             .map_err(|_| worker_unavailable());
+        response_result?;
+        join_result
+    }
+
+    pub fn shutdown_blocking(&self) -> Result<(), PersistenceError> {
+        let join = match self.join.lock().map_err(|_| worker_unavailable())?.take() {
+            Some(join) => join,
+            None => return Ok(()),
+        };
+        let sender = self.sender.as_ref().ok_or_else(worker_unavailable)?.clone();
+        let (respond_to, response) = oneshot::channel();
+        let request_result = sender
+            .blocking_send(Request::Shutdown { respond_to })
+            .map_err(|_| worker_unavailable());
+        let response_result = match request_result {
+            Ok(()) => response.blocking_recv().map_err(|_| worker_unavailable())?,
+            Err(error) => Err(error),
+        };
+        let join_result = join.join().map_err(|_| worker_unavailable());
         response_result?;
         join_result
     }
@@ -103,7 +125,11 @@ impl PersistenceWorker {
 impl Drop for PersistenceWorker {
     fn drop(&mut self) {
         self.sender.take();
-        if let Some(join) = self.join.take() {
+        let joins = match self.join.get_mut() {
+            Ok(joins) => joins,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        if let Some(join) = joins.take() {
             let _ = join.join();
         }
     }

@@ -134,7 +134,8 @@ fn version_parent_must_belong_to_the_same_document() {
 
 #[test]
 fn a_failed_migration_rolls_back_every_statement_and_user_version() {
-    let mut connection = Connection::open_in_memory().unwrap();
+    let temp = TempDir::new().unwrap();
+    let mut connection = Connection::open(database_path(&temp)).unwrap();
     connection
         .execute("CREATE TABLE documents (collision INTEGER)", [])
         .unwrap();
