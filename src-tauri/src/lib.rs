@@ -2,7 +2,8 @@ mod commands;
 mod file_system;
 pub mod persistence;
 
-use persistence::worker::PersistenceWorker;
+use persistence::dto::{PersistenceError, PersistenceErrorCode};
+use persistence::state::PersistenceState;
 use tauri::Manager;
 
 pub fn active_builder() -> tauri::Builder<tauri::Wry> {
@@ -39,13 +40,22 @@ pub fn active_builder() -> tauri::Builder<tauri::Wry> {
         ])
 }
 
+fn app_data_unavailable() -> PersistenceError {
+    PersistenceError::new(
+        PersistenceErrorCode::StorageUnavailable,
+        "persistence storage is unavailable",
+        false,
+    )
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = active_builder()
         .setup(|app| {
-            let app_data_dir = app.path().app_data_dir()?;
-            let persistence = PersistenceWorker::start(app_data_dir)
-                .map_err(|error| std::io::Error::other(error.message))?;
+            let persistence = match app.path().app_data_dir() {
+                Ok(app_data_dir) => PersistenceState::start(app_data_dir),
+                Err(_) => PersistenceState::failed(app_data_unavailable()),
+            };
             app.manage(persistence);
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -60,7 +70,7 @@ pub fn run() {
         .expect("error while building tauri application");
     app.run(|app_handle, event| {
         if let tauri::RunEvent::Exit = event {
-            if let Err(error) = app_handle.state::<PersistenceWorker>().shutdown_blocking() {
+            if let Err(error) = app_handle.state::<PersistenceState>().shutdown_blocking() {
                 log::error!("failed to shut down persistence worker: {}", error.message);
             }
         }

@@ -5,6 +5,7 @@ use tempfile::TempDir;
 static HOME_LOCK: Mutex<()> = Mutex::new(());
 const LIB_SOURCE: &str = include_str!("../src/lib.rs");
 const COMMANDS_SOURCE: &str = include_str!("../src/persistence/commands.rs");
+const CONTRACT: &str = include_str!("../../docs/version-persistence-contract.md");
 
 #[test]
 fn e2e_override_uses_an_isolated_identifier_and_documents_artifact_locations() {
@@ -70,10 +71,26 @@ fn production_exit_explicitly_shuts_down_and_joins_the_typed_worker() {
         assert!(LIB_SOURCE.contains(required), "exit path misses {required}");
     }
     assert!(
-        COMMANDS_SOURCE.contains("State<'_, PersistenceWorker>"),
-        "typed command state must remain PersistenceWorker"
+        COMMANDS_SOURCE.contains("State<'_, PersistenceState>"),
+        "commands must receive the typed startup state"
     );
     assert!(!COMMANDS_SOURCE.contains("Mutex<Connection>"));
+}
+
+#[test]
+fn production_setup_manages_failed_startup_instead_of_exiting_before_webview_mount() {
+    assert!(LIB_SOURCE.contains("PersistenceState::start(app_data_dir)"));
+    assert!(LIB_SOURCE.contains("app.manage(persistence);"));
+    assert!(LIB_SOURCE.contains("Ok(())"));
+    assert!(
+        !LIB_SOURCE.contains("PersistenceWorker::start(app_data_dir)\n                .map_err"),
+        "setup must preserve startup failure in managed state instead of returning it"
+    );
+    assert!(
+        LIB_SOURCE.contains("state::<PersistenceState>()")
+            && LIB_SOURCE.contains(".shutdown_blocking()"),
+        "exit must safely shut down either ready or failed state"
+    );
 }
 
 struct HomeGuard(Option<OsString>);
@@ -151,4 +168,24 @@ fn production_registers_all_fifteen_typed_persistence_commands() {
             "missing typed command registration {required}"
         );
     }
+}
+
+#[test]
+fn frozen_contract_describes_the_delivered_immutable_version_api() {
+    for required in [
+        "`list_versions`",
+        "`get_version`",
+        "`create_version`",
+        "`restore_version`",
+        "content-free summaries",
+        "caller-generated `operationId`",
+        "identical content",
+        "`expectedRevision`",
+        "`restoreSafety`",
+        "`restored_from_version_id`",
+        "`alreadyCurrent`",
+    ] {
+        assert!(CONTRACT.contains(required), "contract misses {required}");
+    }
+    assert!(!CONTRACT.contains("No restore or document-version domain handler is registered yet"));
 }
