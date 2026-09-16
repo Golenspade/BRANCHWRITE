@@ -1,6 +1,6 @@
 # BranchWrite1 📝
 
-[文档中心](https://fankex.com/docs)
+[项目介绍](https://fankex.com/zh-cn/work/BRANCHWRITE)
 
 > 专为作家设计的 SOTA 级别写作软件，融合 Git 风格版本管理与专业 Diff 对比功能
 
